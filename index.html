@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MUGDHA Audit Hub v7 - Complete Audit Management System</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- Firebase Realtime Database (compat SDK — works with CDN, no build step) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #FFFFFF; color: #111111; }
+        #root { display: flex; min-height: 100vh; }
+        @media print { body { background: white; } #sidebar { display: none !important; } .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+const { useState, useMemo, useRef, useEffect } = React;
+
+const COLORS = {
+    primary: '#8B1A4A', primaryDark: '#6B1038', primaryLight: '#B83A6A',
+    gold: '#C9A84C', goldDark: '#A07830',
+    bg: '#FFFFFF',
+    card: '#FFFFFF',
+    section: '#F9F9F9',
+    sidebar: '#1C1C2E', sidebarHover: '#2D2D4A', sidebarActive: '#8B1A4A',
+    text: '#111111',
+    textMuted: '#555555',
+    textLight: '#888888',
+    border: '#E0E0E0',
+    borderLight: '#EFEFEF',
+    success: '#15803d', successBg: '#f0fdf4',
+    error: '#b91c1c', errorBg: '#fef2f2',
+    warning: '#b45309', warningBg: '#fffbeb',
+    info: '#1d4ed8', infoBg: '#eff6ff',
+};
+
+const TAG_COLORS = {
+    WHITE: '#E5E7EB', YELLOW: '#FCD34D', GREEN: '#34D399', ORANGE: '#FB923C',
+    BLUE: '#60A5FA', PINK: '#F472B6', RED: '#EF4444', UNTAGGED: '#9CA3AF'
+};
+
+const DEFAULT_STORES = [
+    { id: 1, code: 'TS-MG-KPHB', name: 'KPHB (Kukatpally)', state: 'Telangana', city: 'Hyderabad', manager: '', active: true },
+    { id: 2, code: 'TS-MG-M2', name: 'Banjara Hills M2', state: 'Telangana', city: 'Hyderabad', manager: '', active: true },
+    { id: 3, code: 'TS-MG-NIZAMPET', name: 'Nizampet', state: 'Telangana', city: 'Hyderabad', manager: '', active: true },
+    { id: 4, code: 'TS-MG-DILSHUKNAGAR', name: 'Dilshuknagar', state: 'Telangana', city: 'Hyderabad', manager: '', active: true },
+    { id: 5, code: 'TS-MG-PATNY', name: 'Patny Center', state: 'Telangana', city: 'Secunderabad', manager: '', active: true },
+    { id: 6, code: 'TS-MG-M10', name: 'M10', state: 'Telangana', city: 'Hyderabad', manager: '', active: true },
+    { id: 7, code: 'KA-MG-MALLESWARAM', name: 'Malleswaram', state: 'Karnataka', city: 'Bangalore', manager: '', active: true },
+    { id: 8, code: 'KA-MG-JAYANAGAR', name: 'Jayanagar', state: 'Karnataka', city: 'Bangalore', manager: '', active: true },
+    { id: 9, code: 'KA-MG-MARATHAHALLI', name: 'Marathahalli', state: 'Karnataka', city: 'Bangalore', manager: '', active: true },
+    { id: 10, code: 'KA-MG-HSR', name: 'HSR Layout', state: 'Karnataka', city: 'Bangalore', manager: '', active: true },
+    { id: 11, code: 'AP-MG-JAGADAMBA', name: 'Jagadamba', state: 'Andhra Pradesh', city: 'Visakhapatnam', manager: '', active: true },
+    { id: 12, code: 'AP-MG-KAKINADA', name: 'Kakinada', state: 'Andhra Pradesh', city: 'Kakinada', manager: '', active: true },
+    { id: 13, code: 'AP-MG-NELLORE', name: 'Nellore', state: 'Andhra Pradesh', city: 'Nellore', manager: '', active: true },
+    { id: 14, code: 'AP-MG-VIJAYAWADA', name: 'Vijayawada', state: 'Andhra Pradesh', city: 'Vijayawada', manager: '', active: true },
+    { id: 15, code: 'AP-SRIVATSA-VJA', name: 'Srivatsa Vijayawada', state: 'Andhra Pradesh', city: 'Vijayawada', manager: '', active: true },
+    { id: 16, code: 'TN-MG-TNAGAR', name: 'T Nagar', state: 'Tamil Nadu', city: 'Chennai', manager: '', active: true },
+    { id: 17, code: 'TS-MG-ONLINE', name: 'Online Store', state: 'All India', city: 'Hyderabad', manager: '', active: true },
+];
+
+const DEFAULT_TEAM = [
+    { id: 1, name: 'Ram', role: 'Internal Audit Manager', phone: '', active: true },
+    { id: 2, name: 'Bhargav Sai', role: 'Audit Associate', phone: '', active: true },
+    { id: 3, name: 'Kyatheswar', role: 'Audit Associate', phone: '', active: true },
+    { id: 4, name: 'Rajesh', role: 'Audit Associate', phone: '', active: true },
+    { id: 5, name: 'Tharun', role: 'Audit Associate', phone: '', active: true },
+    { id: 6, name: 'Laxmikanth Kamble', role: 'Audit Associate', phone: '', active: true },
+    { id: 7, name: 'Harish G', role: 'Audit Associate', phone: '', active: true },
+    { id: 8, name: 'Thimmaraju', role: 'MIS Executive', phone: '', active: true },
+];
+
+const NAV_ITEMS = [
+    { id: 'dashboard', label: 'Dashboard', abbr: 'DB' },
+    { id: 'scanner', label: 'Live Scanner', abbr: 'LS' },
+    { id: 'schedule', label: 'Schedule', abbr: 'SC' },
+    { id: 'upload', label: 'Upload Data', abbr: 'UP' },
+    { id: 'progress', label: 'Progress', abbr: 'PR' },
+    { id: 'analysis', label: 'Analysis', abbr: 'AN' },
+    { id: 'shrinkage', label: 'Shrinkage', abbr: 'SH' },
+    { id: 'reports', label: 'Reports', abbr: 'RP' },
+    { id: 'signoff', label: 'Sign-Off', abbr: 'SO' },
+    { id: 'emails', label: 'Email Drafts', abbr: 'EM' },
+    { id: 'settings', label: 'Settings', abbr: 'ST' },
+];
+
+const formatNumber = (n) => (n || 0).toLocaleString('en-IN');
+const formatCurrency = (n) => '₹' + (n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+// ─── CREDENTIALS ─────────────────────────────────────────────────────────────
+const CREDENTIALS = [
+    { id: 'admin',  username: 'MUGDHA-ADMIN',  password: 'MugdhaAudit@2026', role: 'admin',  name: 'Ram (Admin)',     display: 'J. Rameswar Patro — Internal Audit Manager' },
+    { id: 'staff1', username: 'MUGDHA-S01',    password: 'Staff01#Scan',      role: 'staff',  name: 'Bhargav Sai',     display: 'Audit Associate' },
+    { id: 'staff2', username: 'MUGDHA-S02',    password: 'Staff02#Scan',      role: 'staff',  name: 'Kyatheswar',      display: 'Audit Associate' },
+    { id: 'staff3', username: 'MUGDHA-S03',    password: 'Staff03#Scan',      role: 'staff',  name: 'Rajesh',          display: 'Audit Associate' },
+    { id: 'staff4', username: 'MUGDHA-S04',    password: 'Staff04#Scan',      role: 'staff',  name: 'Tharun',          display: 'Audit Associate' },
+    { id: 'staff5', username: 'MUGDHA-S05',    password: 'Staff05#Scan',      role: 'staff',  name: 'Laxmikanth',      display: 'Audit Associate' },
+    { id: 'staff6', username: 'MUGDHA-S06',    password: 'Staff06#Scan',      role: 'staff',  name: 'Harish G',        display: 'Audit Associate' },
+];
+
+// ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPass, setShowPass] = useState(false);
+    const [error, setError] = useState('');
+    const [showCreds, setShowCreds] = useState(false);
+
+    const handleLogin = () => {
+        const cred = CREDENTIALS.find(c => c.username === username.trim() && c.password === password);
+        if (cred) { setError(''); onLogin(cred); }
+        else { setError('Invalid username or password. Please try again.'); }
+    };
+
+    return (
+        <div style={{ minHeight: '100vh', background: COLORS.sidebar, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div style={{ width: '100%', maxWidth: 440 }}>
+                {/* Logo */}
+                <div style={{ textAlign: 'center', marginBottom: 36 }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 72, height: 72, background: COLORS.primary, borderRadius: 18, marginBottom: 16, boxShadow: '0 8px 32px rgba(139,26,74,0.4)' }}>
+                        <span style={{ fontSize: 32 }}>🏮</span>
+                    </div>
+                    <div style={{ fontSize: 26, fontWeight: 800, color: COLORS.gold, letterSpacing: 3 }}>MUGDHA</div>
+                    <div style={{ fontSize: 13, color: '#888', marginTop: 4, letterSpacing: 1 }}>AUDIT HUB — INTERNAL ACCESS ONLY</div>
+                </div>
+
+                {/* Card */}
+                <div style={{ background: '#FFFFFF', borderRadius: 16, padding: 36, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.text, marginBottom: 6 }}>Sign In</div>
+                    <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 28 }}>Enter your assigned credentials to continue</div>
+
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.text, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Username</label>
+                        <input
+                            type="text" value={username} onChange={e => { setUsername(e.target.value); setError(''); }}
+                            onKeyPress={e => e.key === 'Enter' && handleLogin()}
+                            placeholder="e.g. MUGDHA-ADMIN"
+                            style={{ width: '100%', padding: '12px 14px', border: `1.5px solid ${error ? COLORS.error : COLORS.border}`, borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'monospace', letterSpacing: 0.5 }}
+                            autoFocus
+                        />
+                    </div>
+
+                    <div style={{ marginBottom: 20 }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.text, display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Password</label>
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showPass ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError(''); }}
+                                onKeyPress={e => e.key === 'Enter' && handleLogin()}
+                                placeholder="Enter password"
+                                style={{ width: '100%', padding: '12px 44px 12px 14px', border: `1.5px solid ${error ? COLORS.error : COLORS.border}`, borderRadius: 8, fontSize: 14, outline: 'none' }}
+                            />
+                            <button onClick={() => setShowPass(!showPass)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: COLORS.textMuted }}>
+                                {showPass ? '🙈' : '👁'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {error && <div style={{ background: COLORS.errorBg, border: `1px solid ${COLORS.error}`, borderRadius: 6, padding: '10px 14px', fontSize: 12, color: COLORS.error, marginBottom: 16, fontWeight: 600 }}>⚠ {error}</div>}
+
+                    <button onClick={handleLogin} style={{ width: '100%', padding: '14px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, boxShadow: '0 4px 16px rgba(139,26,74,0.3)' }}>
+                        Sign In →
+                    </button>
+
+                    {/* Staff credentials hint */}
+                    <div style={{ marginTop: 20, textAlign: 'center' }}>
+                        <button onClick={() => setShowCreds(!showCreds)} style={{ background: 'none', border: 'none', color: COLORS.textMuted, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>
+                            {showCreds ? 'Hide' : 'View'} credentials reference
+                        </button>
+                    </div>
+
+                    {showCreds && (
+                        <div style={{ marginTop: 16, background: COLORS.section, borderRadius: 8, padding: 14, border: `1px solid ${COLORS.border}` }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.text, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>User Credentials</div>
+                            {CREDENTIALS.map(c => (
+                                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${COLORS.borderLight}`, fontSize: 11 }}>
+                                    <div>
+                                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: c.role === 'admin' ? COLORS.primary : COLORS.text }}>{c.username}</span>
+                                        <span style={{ color: COLORS.textMuted, marginLeft: 8 }}>{c.name}</span>
+                                    </div>
+                                    <span style={{ background: c.role === 'admin' ? COLORS.primary : COLORS.info, color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>{c.role}</span>
+                                </div>
+                            ))}
+                            <div style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 8 }}>Admin: full access | Staff: scanner + download only</div>
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ textAlign: 'center', marginTop: 20, fontSize: 11, color: '#555' }}>
+                    Mugdha Art Studio LLP — Internal Audit Division © 2026
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const readExcelFile = async (file, sheetName = null) => {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: 'array' });
+    const ws = sheetName && wb.SheetNames.includes(sheetName) ? wb.Sheets[sheetName] : wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws);
+};
+
+const buildIndex = (data, keyField) => {
+    const map = new Map();
+    (data || []).forEach(row => {
+        const key = String(row[keyField] || '').trim().toUpperCase();
+        if (key) map.set(key, row);
+    });
+    return map;
+};
+
+const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => alert('Copied to clipboard!')).catch(() => alert('Failed to copy'));
+};
+
+function CalendarPicker({ label, value, onChange }) {
+    const [open, setOpen] = useState(false);
+    const today = new Date();
+    const [viewYear, setViewYear] = useState(today.getFullYear());
+    const [viewMonth, setViewMonth] = useState(today.getMonth());
+
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+
+    const selectedDate = value ? new Date(value) : null;
+
+    const handleDay = (day) => {
+        const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        onChange(dateStr);
+        setOpen(false);
+    };
+
+    const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y-1); } else setViewMonth(m => m-1); };
+    const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y+1); } else setViewMonth(m => m+1); };
+
+    const isSelected = (day) => selectedDate && selectedDate.getFullYear() === viewYear && selectedDate.getMonth() === viewMonth && selectedDate.getDate() === day;
+    const isToday = (day) => today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day;
+
+    const cells = Array(firstDay).fill(null).concat(Array.from({length: daysInMonth}, (_, i) => i+1));
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    return (
+        <div style={{ position: 'relative' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, marginBottom: 5 }}>{label}</div>
+            <button onClick={() => setOpen(!open)} style={{
+                width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6,
+                background: COLORS.card, cursor: 'pointer', textAlign: 'left', fontSize: 13, color: value ? COLORS.text : COLORS.textMuted,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+                <span>{value || 'Select date'}</span>
+                <span style={{ color: COLORS.primary, fontSize: 16 }}>▼</span>
+            </button>
+            {open && (
+                <div style={{
+                    position: 'absolute', top: '100%', left: 0, zIndex: 1000,
+                    background: COLORS.card, border: `1px solid ${COLORS.border}`,
+                    borderRadius: 8, padding: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                    minWidth: 280, marginTop: 4
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <button onClick={prevMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: COLORS.primary, padding: '0 8px' }}>‹</button>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: COLORS.text }}>{MONTHS[viewMonth]} {viewYear}</div>
+                        <button onClick={nextMonth} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: COLORS.primary, padding: '0 8px' }}>›</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+                        {DAYS.map(d => <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: COLORS.textMuted, padding: '4px 0' }}>{d}</div>)}
+                        {cells.map((day, idx) => (
+                            <div key={idx} onClick={() => day && handleDay(day)} style={{
+                                textAlign: 'center', padding: '7px 2px', borderRadius: 6, cursor: day ? 'pointer' : 'default',
+                                fontSize: 12, fontWeight: isSelected(day) ? 700 : 400,
+                                background: isSelected(day) ? COLORS.primary : isToday(day) ? '#FFF0F5' : 'transparent',
+                                color: isSelected(day) ? 'white' : isToday(day) ? COLORS.primary : day ? COLORS.text : 'transparent',
+                                border: isToday(day) && !isSelected(day) ? `1px solid ${COLORS.primary}` : '1px solid transparent',
+                            }}>{day || ''}</div>
+                        ))}
+                    </div>
+                    <div style={{ marginTop: 10, textAlign: 'center' }}>
+                        <button onClick={() => { onChange(''); setOpen(false); }} style={{ fontSize: 11, color: COLORS.textMuted, background: 'none', border: 'none', cursor: 'pointer' }}>Clear date</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function MugdhaAuditHub({ currentUser, onLogout }) {
+    const isAdmin = currentUser?.role === 'admin';
+    const [activeTab, setActiveTab] = useState(isAdmin ? 'dashboard' : 'scanner');
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [selectedOutlet, setSelectedOutlet] = useState('TS-MG-KPHB');
+    const [stores, setStores] = useState(DEFAULT_STORES);
+    const [teamMembers, setTeamMembers] = useState(DEFAULT_TEAM);
+
+    const [consolidatedData, setConsolidatedData] = useState([]);
+    const [erpStockData, setErpStockData] = useState([]);
+    const [salesData, setSalesData] = useState([]);
+    const [stnInwardData, setStnInwardData] = useState([]);
+    const [stnOutwardData, setStnOutwardData] = useState([]);
+    const [returnsData, setReturnsData] = useState([]);
+
+    const [openingStockErp, setOpeningStockErp] = useState('');
+    const [nonBarcodeItems, setNonBarcodeItems] = useState('');
+    const [storeManagerName, setStoreManagerName] = useState('');
+    const [auditStartDate, setAuditStartDate] = useState('');
+    const [auditEndDate, setAuditEndDate] = useState('');
+    const [auditTeam, setAuditTeam] = useState([]);
+    const [firstTimeAudit, setFirstTimeAudit] = useState(true);
+    const [lastAuditClosingStock, setLastAuditClosingStock] = useState('');
+    const [auditNotes, setAuditNotes] = useState('');
+
+    const [erpRefData, setErpRefData] = useState([]);
+    const [qrd3RefData, setQrd3RefData] = useState([]);
+    const [focusMrnRefData, setFocusMrnRefData] = useState([]);
+    const [erpRefIndex, setErpRefIndex] = useState(new Map());
+    const [qrd3RefIndex, setQrd3RefIndex] = useState(new Map());
+    const [focusMrnRefIndex, setFocusMrnRefIndex] = useState(new Map());
+
+    const [scannedItems, setScannedItems] = useState([]);
+    const [barcodeInput, setBarcodeInput] = useState('');
+    const [scanResult, setScanResult] = useState(null);
+    const [scanQty, setScanQty] = useState(1);
+    const [scanTag, setScanTag] = useState('WHITE');
+    const [scanRack, setScanRack] = useState('');
+    const [scanMrpOverride, setScanMrpOverride] = useState('');
+    const [cameraMode, setCameraMode] = useState(false);
+    const [showRefUpload, setShowRefUpload] = useState(false);
+
+    const [schedules, setSchedules] = useState([]);
+    const [scheduleForm, setScheduleForm] = useState({ outlet: 'TS-MG-KPHB', startDate: '', endDate: '', status: 'PLANNED', estSize: '', team: [] });
+
+    const [estimatedTotal, setEstimatedTotal] = useState('');
+    const [dailyLogs, setDailyLogs] = useState([]);
+    const [newLogEntry, setNewLogEntry] = useState({ date: '', description: '', items: '' });
+
+    const [observations, setObservations] = useState([]);
+    const [newObservation, setNewObservation] = useState('');
+    const [blockers, setBlockers] = useState([]);
+    const [newBlocker, setNewBlocker] = useState('');
+
+    const [riskThresholds, setRiskThresholds] = useState({ low: 2, medium: 5, high: 10 });
+    const [newStoreForm, setNewStoreForm] = useState({ code: '', name: '', state: '', city: '', manager: '' });
+    const [newMemberForm, setNewMemberForm] = useState({ name: '', role: '', phone: '' });
+
+    const qrcodeRef = useRef(null);
+    const barcodeInputRef = useRef(null);
+    const [manualItem, setManualItem] = useState({ desc: '', qty: 1, mrp: '', tag: 'WHITE', vendor: '', rack: '', category: 'Uncategorized' });
+    const [showManualEntry, setShowManualEntry] = useState(false);
+    const [lastAddedLabel, setLastAddedLabel] = useState('');
+
+    const TAG_KEYS = { w: 'WHITE', y: 'YELLOW', g: 'GREEN', o: 'ORANGE', b: 'BLUE', p: 'PINK', r: 'RED', u: 'UNTAGGED' };
+    const TAG_SHORTCUT_LABELS = { WHITE: 'W', YELLOW: 'Y', GREEN: 'G', ORANGE: 'O', BLUE: 'B', PINK: 'P', RED: 'R', UNTAGGED: 'U' };
+
+    // ─── FIREBASE REAL-TIME SYNC ────────────────────────────────────────────────
+    const [fbConfig, setFbConfig] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('mugdha_fb_config') || 'null') || null; } catch { return null; }
+    });
+    const [fbConfigForm, setFbConfigForm] = useState({ apiKey: '', authDomain: '', databaseURL: '', projectId: '' });
+    const [fbDb, setFbDb] = useState(null);
+    const [sessionCode, setSessionCode] = useState(() => localStorage.getItem('mugdha_session') || '');
+    const [sessionCodeInput, setSessionCodeInput] = useState('');
+    const [fbStatus, setFbStatus] = useState('offline'); // offline | connecting | live | error
+    const [liveStaff, setLiveStaff] = useState({});   // {username: {name, lastSeen, count}}
+    const fbRef = useRef(null);
+
+    // Init Firebase once config is set
+    useEffect(() => {
+        if (!fbConfig || !fbConfig.databaseURL) return;
+        try {
+            let app;
+            if (window.firebase) {
+                try { app = firebase.app('mugdha'); }
+                catch { app = firebase.initializeApp(fbConfig, 'mugdha'); }
+                const db = firebase.database(app);
+                setFbDb(db);
+                setFbStatus('connecting');
+            }
+        } catch(err) { setFbStatus('error'); console.error('Firebase init:', err); }
+    }, [fbConfig]);
+
+    // Subscribe to session items in real-time (admin watches ALL staff items)
+    useEffect(() => {
+        if (!fbDb || !sessionCode) { setFbStatus(fbDb ? 'connecting' : 'offline'); return; }
+        setFbStatus('connecting');
+        const path = `mugdha-audit/sessions/${sessionCode}/items`;
+        const ref = fbDb.ref(path);
+        fbRef.current = ref;
+        const handler = ref.on('value', (snap) => {
+            setFbStatus('live');
+            const data = snap.val();
+            if (!data) return;
+            const items = Object.values(data).sort((a,b) => (a.ts||0) - (b.ts||0));
+            setScannedItems(items);
+        }, (err) => { setFbStatus('error'); console.error('FB listener:', err); });
+
+        // Watch connected staff presence
+        const staffRef = fbDb.ref(`mugdha-audit/sessions/${sessionCode}/staff`);
+        staffRef.on('value', snap => { const d = snap.val(); if (d) setLiveStaff(d); });
+
+        // Write own presence
+        const myPresenceRef = fbDb.ref(`mugdha-audit/sessions/${sessionCode}/staff/${currentUser.id}`);
+        myPresenceRef.set({ name: currentUser.name, role: currentUser.role, lastSeen: Date.now(), count: 0 });
+
+        return () => {
+            ref.off('value', handler);
+            staffRef.off();
+            fbRef.current = null;
+        };
+    }, [fbDb, sessionCode]);
+
+    // Write a single item to Firebase
+    const fbWriteItem = (item) => {
+        if (!fbDb || !sessionCode) return;
+        fbDb.ref(`mugdha-audit/sessions/${sessionCode}/items/${item.id}`).set(item);
+        // Update own staff count
+        fbDb.ref(`mugdha-audit/sessions/${sessionCode}/staff/${currentUser.id}/count`).transaction(v => (v||0)+1);
+        fbDb.ref(`mugdha-audit/sessions/${sessionCode}/staff/${currentUser.id}/lastSeen`).set(Date.now());
+    };
+
+    const fbDeleteItem = (itemId) => {
+        if (!fbDb || !sessionCode) return;
+        fbDb.ref(`mugdha-audit/sessions/${sessionCode}/items/${itemId}`).remove();
+    };
+
+    const createSession = () => {
+        const outlet = stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet;
+        const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+        const code = selectedOutlet.replace('TS-MG-','').replace('KA-MG-','').replace('AP-MG-','').slice(0,4).toUpperCase() + '-' + suffix;
+        setSessionCode(code);
+        localStorage.setItem('mugdha_session', code);
+        if (fbDb) {
+            fbDb.ref(`mugdha-audit/sessions/${code}`).set({
+                outlet: selectedOutlet, outletName: outlet,
+                createdBy: currentUser.name, createdAt: Date.now(),
+                openingStock: parseInt(openingStockErp)||0, active: true,
+            });
+        }
+    };
+
+    const joinSession = () => {
+        const code = sessionCodeInput.trim().toUpperCase();
+        if (!code) return;
+        setSessionCode(code);
+        localStorage.setItem('mugdha_session', code);
+        setSessionCodeInput('');
+        // Pull session info for staff (outlet, openingStock)
+        if (fbDb) {
+            fbDb.ref(`mugdha-audit/sessions/${code}`).once('value').then(snap => {
+                const d = snap.val();
+                if (d) { if (d.openingStock) setOpeningStockErp(String(d.openingStock)); if (d.outlet) setSelectedOutlet(d.outlet); }
+            });
+        }
+    };
+
+    const disconnectSession = () => {
+        setSessionCode(''); localStorage.removeItem('mugdha_session'); setScannedItems([]); setLiveStaff({}); setFbStatus(fbDb ? 'connecting' : 'offline');
+    };
+
+    const fbStatusColor = { offline: COLORS.textMuted, connecting: COLORS.warning, live: COLORS.success, error: COLORS.error }[fbStatus];
+    const fbStatusLabel = { offline: '○ Offline', connecting: '◌ Connecting…', live: '● Live', error: '✕ Error' }[fbStatus];
+
+    // Keyboard shortcut: when scanResult is showing, press W/Y/G/O/B/P/R/U to select tag + add instantly
+    useEffect(() => {
+        const handler = (e) => {
+            if (!scanResult) return;
+            // Don't fire if user is typing in an input/textarea
+            if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) {
+                // Allow Escape from input fields to dismiss
+                if (e.key === 'Escape') { setScanResult(null); setBarcodeInput(''); setTimeout(() => barcodeInputRef.current?.focus(), 50); }
+                return;
+            }
+            const tag = TAG_KEYS[e.key.toLowerCase()];
+            if (tag) {
+                e.preventDefault();
+                setScanTag(tag);
+                const mrpVal = scanMrpOverride ? parseFloat(scanMrpOverride) : scanResult.mrp;
+                const newItem = { id: Date.now(), ts: Date.now(), barcode: scanResult.barcode, qty: scanQty, tagType: tag, mrp: mrpVal, cp: scanResult.cp, erpStatus: scanResult.erpStatus, vendorErp: scanResult.vendorErp, rack: scanRack, isManual: false, scannedBy: currentUser?.name || '' };
+                if (fbDb && sessionCode) { fbWriteItem(newItem); }
+                else { setScannedItems(prev => [...prev, newItem]); }
+                setLastAddedLabel(`✓ Added: ${scanResult.barcode} — ${tag} tag`);
+                setScanQty(1); setScanRack(''); setScanMrpOverride(''); setScanResult(null); setBarcodeInput('');
+                setTimeout(() => { barcodeInputRef.current?.focus(); setLastAddedLabel(''); }, 1200);
+            }
+            if (e.key === 'Escape') { setScanResult(null); setBarcodeInput(''); setTimeout(() => barcodeInputRef.current?.focus(), 50); }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [scanResult, scanMrpOverride, scanQty, scanRack]);
+
+    const addManualItem = () => {
+        if (!manualItem.desc && !manualItem.mrp) { alert('Enter at least a description or MRP.'); return; }
+        const newItem = { id: Date.now(), ts: Date.now(), barcode: manualItem.desc || 'MANUAL-ENTRY', qty: parseInt(manualItem.qty)||1, tagType: manualItem.tag, mrp: parseFloat(manualItem.mrp)||0, cp: 0, erpStatus: 'NOT PART OF ERP', vendorErp: manualItem.vendor || '—', rack: manualItem.rack, isManual: true, category: manualItem.category, scannedBy: currentUser?.name || '' };
+        if (fbDb && sessionCode) { fbWriteItem(newItem); }
+        else { setScannedItems(prev => [...prev, newItem]); }
+        setManualItem({ desc: '', qty: 1, mrp: '', tag: 'WHITE', vendor: '', rack: '', category: 'Uncategorized' });
+        setLastAddedLabel('✓ Manual item added');
+        setTimeout(() => setLastAddedLabel(''), 1200);
+    };
+
+    const effectiveConsolidatedData = useMemo(() => {
+        if (consolidatedData.length > 0) return consolidatedData;
+        return scannedItems.map(item => ({
+            BARCODE: item.barcode,
+            'PHY QTY': item.qty,
+            'TAG TYPE': item.tagType,
+            MRP: item.mrp,
+            CP: item.cp,
+            'ERP STATUS': item.erpStatus,
+            'VENDOR DETAILS': item.vendorErp,
+        }));
+    }, [consolidatedData, scannedItems]);
+
+    const calculations = useMemo(() => {
+        const physicalScanned = (effectiveConsolidatedData || []).reduce((sum, row) => sum + (parseInt(row['PHY QTY']) || 0), 0);
+        const physicalCount = physicalScanned + (parseInt(nonBarcodeItems) || 0);
+        const erpOpening = parseInt(openingStockErp) || 0;
+        const stnInQty = (stnInwardData || []).reduce((sum, row) => sum + (parseInt(row.Quantity || row.QTY || row.Qty) || 0), 0);
+        const stnOutQty = (stnOutwardData || []).reduce((sum, row) => sum + (parseInt(row.Quantity || row.QTY || row.Qty) || 0), 0);
+        const returnsQty = (returnsData || []).length;
+        const salesQty = (salesData || []).reduce((sum, row) => sum + (parseInt(row.SoldQuantity) || 1), 0);
+        const erpAdjusted = erpOpening + stnInQty - stnOutQty + returnsQty - salesQty;
+        const variance = physicalCount - erpAdjusted;
+        const variancePercent = erpAdjusted !== 0 ? (variance / erpAdjusted) * 100 : 0;
+        const erpMatched = (effectiveConsolidatedData || []).filter(r => r['ERP STATUS'] === 'YES').length;
+        const ghostStock = (effectiveConsolidatedData || []).filter(r => r['ERP STATUS'] === 'NOT PART OF ERP').length;
+        const matchRate = effectiveConsolidatedData.length > 0 ? (erpMatched / effectiveConsolidatedData.length) * 100 : 0;
+        const shrinkagePieces = Math.max(0, erpAdjusted - physicalCount);
+        const shrinkageRate = erpAdjusted > 0 ? (shrinkagePieces / erpAdjusted) * 100 : 0;
+        const mrvValue = (effectiveConsolidatedData || []).reduce((sum, row) => sum + ((parseInt(row['PHY QTY']) || 0) * (parseFloat(row.MRP) || 0)), 0);
+        const cpValue = (effectiveConsolidatedData || []).reduce((sum, row) => sum + ((parseInt(row['PHY QTY']) || 0) * (parseFloat(row.CP) || 0)), 0);
+
+        let riskRating = 'LOW';
+        if (shrinkageRate > riskThresholds.high) riskRating = 'CRITICAL';
+        else if (shrinkageRate > riskThresholds.medium) riskRating = 'HIGH';
+        else if (shrinkageRate > riskThresholds.low) riskRating = 'MEDIUM';
+
+        const tagDistribution = {};
+        (effectiveConsolidatedData || []).forEach(row => {
+            const tag = row['TAG TYPE'] || 'UNTAGGED';
+            if (!tagDistribution[tag]) tagDistribution[tag] = { count: 0, qty: 0, mrvValue: 0 };
+            tagDistribution[tag].count += 1;
+            tagDistribution[tag].qty += parseInt(row['PHY QTY']) || 0;
+            tagDistribution[tag].mrvValue += (parseInt(row['PHY QTY']) || 0) * (parseFloat(row.MRP) || 0);
+        });
+
+        const lastClosing = parseInt(lastAuditClosingStock) || 0;
+        const expected2 = lastClosing + stnInQty - stnOutQty + returnsQty - salesQty;
+        const variance2 = physicalCount - expected2;
+        const variancePercent2 = expected2 !== 0 ? (variance2 / expected2) * 100 : 0;
+
+        const categories = {};
+        (salesData || []).forEach(row => {
+            const cat = row.Category || 'Uncategorized';
+            if (!categories[cat]) categories[cat] = { count: 0, qty: 0, value: 0 };
+            categories[cat].count += 1;
+            categories[cat].qty += parseInt(row.SoldQuantity) || 0;
+            categories[cat].value += (parseInt(row.SoldQuantity) || 0) * (parseFloat(row.MRP) || 0);
+        });
+
+        return {
+            physicalCount, physicalScanned, erpOpening, stnInQty, stnOutQty, returnsQty, salesQty, erpAdjusted,
+            variance, variancePercent, erpMatched, ghostStock, matchRate, shrinkagePieces, shrinkageRate,
+            mrvValue, cpValue, riskRating, tagDistribution, expected2, variance2, variancePercent2, categories
+        };
+    }, [effectiveConsolidatedData, nonBarcodeItems, openingStockErp, stnInwardData, stnOutwardData, returnsData, salesData, lastAuditClosingStock, riskThresholds]);
+
+    const addScanItem = () => {
+        if (!scanResult) return;
+        const mrpVal = scanMrpOverride ? parseFloat(scanMrpOverride) : scanResult.mrp;
+        const newItem = { id: Date.now(), ts: Date.now(), barcode: scanResult.barcode, qty: scanQty, tagType: scanTag, mrp: mrpVal, cp: scanResult.cp, erpStatus: scanResult.erpStatus, vendorErp: scanResult.vendorErp, rack: scanRack, isManual: false, scannedBy: currentUser?.name || '' };
+        if (fbDb && sessionCode) { fbWriteItem(newItem); }
+        else { setScannedItems(prev => [...prev, newItem]); }
+        setLastAddedLabel(`✓ Added: ${scanResult.barcode} — ${scanTag} tag`);
+        setScanQty(1); setScanTag('WHITE'); setScanRack(''); setScanMrpOverride(''); setScanResult(null); setBarcodeInput('');
+        setTimeout(() => { barcodeInputRef.current?.focus(); setLastAddedLabel(''); }, 1200);
+    };
+
+    const removeScannedItem = (itemId) => {
+        if (fbDb && sessionCode) { fbDeleteItem(itemId); }
+        else { setScannedItems(prev => prev.filter(i => i.id !== itemId)); }
+    };
+
+    const scanBarcode = (barcode) => {
+        if (!barcode.trim()) return;
+        const key = barcode.toUpperCase().trim();
+        const erpMatch = erpRefIndex.get(key);
+        const qrd3Match = qrd3RefIndex.get(key);
+        const mrnMatch = focusMrnRefIndex.get(key);
+
+        // Even if not found in any ref, still create a result so staff can log it as ghost stock
+        setScanResult({
+            barcode: barcode.trim(),
+            erpStatus: erpMatch ? 'YES' : 'NOT PART OF ERP',
+            mrp: erpMatch?.MRP || qrd3Match?.MRP || mrnMatch?.MRP || 0,
+            cp: erpMatch?.['Cost Price'] || erpMatch?.CP || 0,
+            erpQty: erpMatch?.Quantity || 0,
+            vendorErp: erpMatch?.Vendor || '—',
+            vendorMrn: mrnMatch?.['VendorAC.Name'] || '—',
+            vendorQrd3: qrd3Match?.['Vendor Name'] || '—',
+        });
+        setScanMrpOverride('');
+    };
+
+    const dataSource = consolidatedData.length > 0 ? 'Uploaded File' : 'Live Scanner';
+
+    const renderDashboard = () => (
+        <div style={{ padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div>
+                    <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 5 }}>Dashboard</h1>
+                    <div style={{ fontSize: 13, color: COLORS.textMuted }}>
+                        Outlet: <strong>{stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet}</strong> | Data Source: <strong style={{ color: COLORS.primary }}>{dataSource}</strong>
+                    </div>
+                </div>
+                <select value={selectedOutlet} onChange={(e) => setSelectedOutlet(e.target.value)}
+                    style={{ padding: '8px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 14, color: COLORS.text }}>
+                    {stores.filter(s => s.active).map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+                </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+                {[
+                    { label: 'Physical Count', value: formatNumber(calculations.physicalCount), color: COLORS.info },
+                    { label: 'ERP Adjusted', value: formatNumber(calculations.erpAdjusted), color: COLORS.primary },
+                    { label: 'Variance', value: formatNumber(calculations.variance) + ` (${calculations.variancePercent.toFixed(2)}%)`, color: COLORS.warning },
+                    { label: 'Match Rate', value: calculations.matchRate.toFixed(1) + '%', color: COLORS.success },
+                    { label: 'Shrinkage', value: calculations.shrinkagePieces + ' units', color: COLORS.error },
+                    { label: 'Risk Rating', value: calculations.riskRating, color: calculations.riskRating === 'CRITICAL' ? COLORS.error : calculations.riskRating === 'HIGH' ? COLORS.warning : COLORS.success },
+                ].map((metric, idx) => (
+                    <div key={idx} style={{
+                        background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 16,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                    }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, marginBottom: 8 }}>{metric.label}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: metric.color }}>{metric.value}</div>
+                    </div>
+                ))}
+            </div>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Tag Distribution</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+                    {Object.entries(calculations.tagDistribution).map(([tag, data]) => (
+                        <div key={tag} style={{ background: COLORS.section, borderRadius: 8, padding: 12, border: `2px solid ${TAG_COLORS[tag] || COLORS.border}` }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.textMuted, marginBottom: 4 }}>{tag}</div>
+                            <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.text }}>{data.count}</div>
+                            <div style={{ fontSize: 11, color: COLORS.textLight, marginTop: 4 }}>Qty: {data.qty} | Value: {formatCurrency(data.mrvValue)}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+
+    const downloadScanData = () => {
+        if (scannedItems.length === 0) { alert('No scanned items to download.'); return; }
+        const rows = [['S NO','BARCODE','QTY','TAG TYPE','MRP','CP','VENDOR NAME-MRP','ERP STATUS','SCANNED BY','OUTLET']];
+        scannedItems.forEach((item, idx) => {
+            rows.push([idx+1, item.barcode, item.qty, item.tagType, item.mrp, item.cp, item.vendorErp, item.erpStatus, currentUser?.name || '', stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'ERP-SCANNING');
+        XLSX.writeFile(wb, `Scan_${selectedOutlet}_${currentUser?.name || 'staff'}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    };
+
+    const renderScanner = () => {
+        const totalScannedPcs = scannedItems.reduce((s,i) => s + i.qty, 0);
+        const erpMatched = scannedItems.filter(i => i.erpStatus === 'YES').length;
+        const ghostCount = scannedItems.filter(i => i.erpStatus === 'NOT PART OF ERP').length;
+        const matchPct = scannedItems.length > 0 ? ((erpMatched / scannedItems.length)*100).toFixed(1) : '0.0';
+        const liveVariance = (parseInt(openingStockErp)||0) - totalScannedPcs;
+        const liveVariancePct = (parseInt(openingStockErp)||0) > 0 ? ((liveVariance / (parseInt(openingStockErp)||1))*100).toFixed(2) : '0.00';
+        const erpLoaded = erpRefData.length > 0;
+        const totalMRV = scannedItems.reduce((s,i) => s + (i.qty * (i.mrp||0)), 0);
+
+        return (
+        <div style={{ padding: 20, maxWidth: 1100, margin: '0 auto' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                <div>
+                    <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.text, marginBottom: 4 }}>Live Scanner</h1>
+                    <div style={{ fontSize: 12, color: COLORS.textMuted }}>
+                        Outlet: <strong>{stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet}</strong>
+                        &nbsp;|&nbsp;Operator: <strong style={{ color: COLORS.primary }}>{currentUser?.name}</strong>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                    {!isAdmin && (
+                        <select value={selectedOutlet} onChange={e => setSelectedOutlet(e.target.value)}
+                            style={{ padding: '8px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}>
+                            {stores.filter(s => s.active).map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+                        </select>
+                    )}
+                    <button onClick={downloadScanData} style={{ padding: '8px 16px', background: COLORS.success, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+                        ⬇ Download Scan Data
+                    </button>
+                    <button onClick={onLogout} style={{ padding: '8px 14px', background: COLORS.section, color: COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+
+            {/* ─── REAL-TIME SESSION PANEL ─────────────────────────────── */}
+            <div style={{ background: COLORS.sidebar, borderRadius: 12, padding: '14px 20px', marginBottom: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
+                {/* Status pill */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: fbStatusColor, display: 'inline-block', flexShrink: 0 }}></span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: fbStatusColor }}>{fbStatusLabel}</span>
+                    {sessionCode && <span style={{ fontSize: 11, color: '#aaa', marginLeft: 6 }}>Session: <strong style={{ color: COLORS.gold, fontFamily: 'monospace', letterSpacing: 1 }}>{sessionCode}</strong></span>}
+                </div>
+
+                {/* Admin: create / end session */}
+                {isAdmin && !sessionCode && fbDb && (
+                    <button onClick={createSession} style={{ padding: '7px 16px', background: COLORS.gold, color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>
+                        ⚡ Create Live Session
+                    </button>
+                )}
+                {isAdmin && !fbDb && (
+                    <span style={{ fontSize: 11, color: '#888' }}>Configure Firebase in Settings → Live Sync to enable real-time collaboration.</span>
+                )}
+                {isAdmin && sessionCode && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', borderRadius: 8, padding: '5px 12px' }}>
+                            <span style={{ fontSize: 10, color: '#aaa', marginRight: 6 }}>Share code with staff:</span>
+                            <strong style={{ color: COLORS.gold, fontFamily: 'monospace', fontSize: 14, letterSpacing: 2 }}>{sessionCode}</strong>
+                        </div>
+                        <button onClick={disconnectSession} style={{ padding: '6px 12px', background: 'rgba(185,28,28,0.2)', border: '1px solid rgba(185,28,28,0.4)', color: '#f87171', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>
+                            ✕ End Session
+                        </button>
+                    </div>
+                )}
+
+                {/* Staff: join session */}
+                {!isAdmin && !sessionCode && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input value={sessionCodeInput} onChange={e => setSessionCodeInput(e.target.value.toUpperCase())}
+                            onKeyDown={e => e.key === 'Enter' && joinSession()}
+                            placeholder="Enter session code (e.g. KPHB-A3B2)"
+                            style={{ padding: '7px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, fontFamily: 'monospace', width: 200, background: COLORS.bg }} />
+                        <button onClick={joinSession} style={{ padding: '7px 14px', background: COLORS.gold, color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>
+                            Join
+                        </button>
+                    </div>
+                )}
+                {!isAdmin && sessionCode && (
+                    <button onClick={disconnectSession} style={{ padding: '6px 12px', background: 'rgba(185,28,28,0.2)', border: '1px solid rgba(185,28,28,0.4)', color: '#f87171', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>
+                        ✕ Leave Session
+                    </button>
+                )}
+
+                {/* Live staff list */}
+                {Object.keys(liveStaff).length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 10, color: '#888', fontWeight: 600, textTransform: 'uppercase' }}>Online:</span>
+                        {Object.entries(liveStaff).map(([uid, s]) => (
+                            <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.07)', borderRadius: 20, padding: '3px 10px' }}>
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}></span>
+                                <span style={{ fontSize: 11, color: 'white' }}>{s.name}</span>
+                                <span style={{ fontSize: 10, color: COLORS.gold, fontWeight: 700 }}>{s.count || 0}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* STEP 1 — ERP Upload */}
+            <div style={{ background: erpLoaded ? COLORS.successBg : COLORS.card, border: `2px solid ${erpLoaded ? COLORS.success : COLORS.primary}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: erpLoaded ? COLORS.success : COLORS.primary, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>1</div>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Upload ERP Stock Reference</div>
+                            {erpLoaded && <span style={{ background: COLORS.success, color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>✓ LOADED</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: COLORS.textMuted, marginLeft: 38 }}>
+                            {erpLoaded
+                                ? `${erpRefData.length.toLocaleString('en-IN')} items indexed — ready to scan`
+                                : 'Upload the ERP-STOCK Excel file before scanning. This is used to auto-fill MRP, CP, and vendor details.'}
+                        </div>
+                    </div>
+                    <label style={{ padding: '10px 20px', background: erpLoaded ? COLORS.success : COLORS.primary, color: 'white', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {erpLoaded ? '↺ Re-Upload ERP' : '↑ Upload ERP-STOCK Excel'}
+                        <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={async (e) => {
+                            const file = e.target.files[0]; if (!file) return;
+                            try {
+                                let data = await readExcelFile(file, 'ERP-STOCK');
+                                if (!data || data.length === 0) data = await readExcelFile(file);
+                                setErpRefData(data);
+                                setErpRefIndex(buildIndex(data, 'BARCODE'));
+                                // also auto-set opening stock from ERP
+                                const total = data.reduce((s,r) => s + (parseInt(r.QTY)||0), 0);
+                                if (total > 0 && !openingStockErp) setOpeningStockErp(String(total));
+                            } catch(err) { alert('Error reading ERP file: ' + err.message); }
+                            e.target.value = '';
+                        }} />
+                    </label>
+                </div>
+                {erpLoaded && (
+                    <div style={{ marginLeft: 38, marginTop: 10, display: 'flex', gap: 20 }}>
+                        <div style={{ fontSize: 12 }}><span style={{ color: COLORS.textMuted }}>Opening Stock:</span> <strong style={{ color: COLORS.text }}>{formatNumber(parseInt(openingStockErp)||0)} pcs</strong></div>
+                        <div style={{ fontSize: 12 }}><span style={{ color: COLORS.textMuted }}>Scanned so far:</span> <strong style={{ color: COLORS.primary }}>{formatNumber(totalScannedPcs)} pcs</strong></div>
+                    </div>
+                )}
+            </div>
+
+            {/* STEP 2 — Scan Barcode */}
+            <div style={{ background: COLORS.card, border: `2px solid ${!erpLoaded ? COLORS.border : COLORS.gold}`, borderRadius: 12, padding: 20, marginBottom: 16, opacity: !erpLoaded ? 0.5 : 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: !erpLoaded ? COLORS.textLight : COLORS.gold, color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>2</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>Scan or Type Barcode</div>
+                    </div>
+                    {/* Last added flash */}
+                    {lastAddedLabel && (
+                        <div style={{ background: COLORS.successBg, border: `1px solid ${COLORS.success}`, color: COLORS.success, padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, animation: 'none' }}>
+                            {lastAddedLabel}
+                        </div>
+                    )}
+                </div>
+
+                {!cameraMode ? (
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+                        <input
+                            ref={barcodeInputRef}
+                            type="text" value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && erpLoaded && barcodeInput.trim()) { scanBarcode(barcodeInput); } }}
+                            placeholder={erpLoaded ? 'Point scanner gun here or type barcode → Enter' : 'Upload ERP Stock first (Step 1)'}
+                            disabled={!erpLoaded}
+                            style={{ flex: 1, padding: '14px 16px', border: `2px solid ${COLORS.gold}`, borderRadius: 8, fontSize: 15, fontFamily: 'monospace', outline: 'none', letterSpacing: 0.5, background: !erpLoaded ? COLORS.section : COLORS.bg }}
+                            autoFocus={erpLoaded}
+                        />
+                        <button onClick={() => erpLoaded && barcodeInput.trim() && scanBarcode(barcodeInput)} disabled={!erpLoaded}
+                            style={{ padding: '14px 24px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 8, cursor: erpLoaded ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: 14 }}>
+                            Look Up
+                        </button>
+                        <button onClick={() => erpLoaded && setCameraMode(true)} disabled={!erpLoaded}
+                            style={{ padding: '14px 18px', background: COLORS.sidebar, color: 'white', border: 'none', borderRadius: 8, cursor: erpLoaded ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: 13 }}>
+                            📷
+                        </button>
+                        <button onClick={() => setShowManualEntry(!showManualEntry)}
+                            style={{ padding: '14px 16px', background: showManualEntry ? COLORS.warning : COLORS.section, color: showManualEntry ? 'white' : COLORS.text, border: `1px solid ${COLORS.border}`, borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>
+                            + Non-ERP
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{ textAlign: 'center' }}>
+                        <div id="qr-reader" style={{ width: '100%', maxWidth: 400, margin: '0 auto' }}></div>
+                        <button onClick={() => setCameraMode(false)} style={{ marginTop: 12, padding: '10px 20px', background: COLORS.error, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                            Close Camera
+                        </button>
+                    </div>
+                )}
+
+                {/* Non-ERP Manual Entry Panel */}
+                {showManualEntry && (
+                    <div style={{ marginTop: 16, padding: 16, background: '#FFF8E7', border: `2px solid ${COLORS.warning}`, borderRadius: 10 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.warning, marginBottom: 12 }}>
+                            ⚠ Non-ERP / Ghost Stock / Manual Entry
+                            <span style={{ fontSize: 11, fontWeight: 400, color: COLORS.textMuted, marginLeft: 8 }}>Use for items not in ERP, damaged stock, non-barcode sarees, or any item that couldn't be scanned.</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+                            <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>DESCRIPTION / BARCODE</div>
+                                <input type="text" value={manualItem.desc} onChange={e => setManualItem({...manualItem, desc: e.target.value})}
+                                    placeholder="e.g. Silk saree - no tag, or barcode"
+                                    style={{ width: '100%', padding: '9px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>MRP (₹)</div>
+                                <input type="number" value={manualItem.mrp} onChange={e => setManualItem({...manualItem, mrp: e.target.value})}
+                                    placeholder="0"
+                                    style={{ width: '100%', padding: '9px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 14, fontWeight: 600 }} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>QTY</div>
+                                <input type="number" min="1" value={manualItem.qty} onChange={e => setManualItem({...manualItem, qty: parseInt(e.target.value)||1})}
+                                    style={{ width: '100%', padding: '9px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>COLOUR TAG</div>
+                                <select value={manualItem.tag} onChange={e => setManualItem({...manualItem, tag: e.target.value})}
+                                    style={{ width: '100%', padding: '9px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12 }}>
+                                    {['WHITE','YELLOW','GREEN','ORANGE','BLUE','PINK','RED','UNTAGGED'].map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>RACK</div>
+                                <input type="text" value={manualItem.rack} onChange={e => setManualItem({...manualItem, rack: e.target.value})}
+                                    placeholder="e.g. A3"
+                                    style={{ width: '100%', padding: '9px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, marginBottom: 4 }}>VENDOR / NOTES (optional)</div>
+                                <input type="text" value={manualItem.vendor} onChange={e => setManualItem({...manualItem, vendor: e.target.value})}
+                                    placeholder="Vendor name or notes about this item..."
+                                    style={{ width: '100%', padding: '9px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                            </div>
+                            <button onClick={addManualItem} style={{ padding: '10px 24px', background: COLORS.warning, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 800, fontSize: 14, whiteSpace: 'nowrap', alignSelf: 'flex-end' }}>
+                                + Add Non-ERP
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* STEP 3 — Item Details & Confirm (keyboard shortcut mode) */}
+            {scanResult && (
+                <div style={{ background: COLORS.card, borderRadius: 12, overflow: 'hidden', border: `2px solid ${scanResult.erpStatus === 'NOT PART OF ERP' ? COLORS.error : COLORS.success}`, marginBottom: 16 }}>
+                    {/* ERP Status Banner */}
+                    <div style={{ background: scanResult.erpStatus === 'NOT PART OF ERP' ? COLORS.error : COLORS.success, padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>3</div>
+                            <div>
+                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginBottom: 2 }}>ERP STATUS</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: 'white', letterSpacing: 1 }}>
+                                    {scanResult.erpStatus === 'NOT PART OF ERP' ? '✗ NOT IN ERP — GHOST STOCK' : '✓ FOUND IN ERP'}
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.85)', background: 'rgba(0,0,0,0.15)', borderRadius: 8, padding: '6px 12px' }}>
+                                <div style={{ fontSize: 9, marginBottom: 2 }}>ESC to dismiss</div>
+                                <div style={{ fontSize: 10, fontWeight: 700 }}>↵ ENTER TAG KEY</div>
+                            </div>
+                            <div style={{ textAlign: 'right', color: 'white' }}>
+                                <div style={{ fontSize: 10, opacity: 0.8, marginBottom: 2 }}>BARCODE</div>
+                                <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>{scanResult.barcode}</div>
+                                <div style={{ fontSize: 10, opacity: 0.8, marginTop: 2 }}>Item #{scannedItems.length + 1}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Auto-filled data */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', background: COLORS.section, borderBottom: `1px solid ${COLORS.border}` }}>
+                        {[
+                            { label: 'MRP (ERP)', value: formatCurrency(scanResult.mrp), big: true, color: COLORS.primary },
+                            { label: 'COST PRICE', value: formatCurrency(scanResult.cp), big: true, color: COLORS.text },
+                            { label: 'VENDOR (ERP)', value: scanResult.vendorErp || '—', big: false, color: COLORS.text },
+                            { label: 'VENDOR (QRD3)', value: scanResult.vendorQrd3 || '—', big: false, color: COLORS.text },
+                        ].map((d, i) => (
+                            <div key={i} style={{ padding: '12px 16px', borderRight: i < 3 ? `1px solid ${COLORS.border}` : 'none' }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{d.label}</div>
+                                <div style={{ fontSize: d.big ? 20 : 13, fontWeight: 700, color: d.color, lineHeight: 1.2 }}>{d.value}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Keyboard tag selector + optional overrides */}
+                    <div style={{ padding: '14px 20px', background: COLORS.card }}>
+                        {/* Keyboard shortcut hint bar */}
+                        <div style={{ background: COLORS.sidebar, borderRadius: 8, padding: '10px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.gold, whiteSpace: 'nowrap' }}>⌨ PRESS KEY TO TAG &amp; ADD INSTANTLY:</div>
+                            {Object.entries(TAG_SHORTCUT_LABELS).map(([tag, key]) => (
+                                <div key={tag} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                    <span style={{
+                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                        width: 24, height: 24, borderRadius: 5, fontWeight: 800, fontSize: 13,
+                                        background: scanTag === tag ? COLORS.gold : 'rgba(255,255,255,0.15)', color: scanTag === tag ? '#000' : 'white',
+                                        border: scanTag === tag ? `2px solid ${COLORS.gold}` : '1px solid rgba(255,255,255,0.2)',
+                                        fontFamily: 'monospace', cursor: 'pointer',
+                                    }} onClick={() => addScanItem() /* clicking key selects it visually */}>{key}</span>
+                                    <span style={{ fontSize: 10, color: '#aaa' }}>{tag}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Colour Tag visual buttons (clickable too) + optional fields */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 12, alignItems: 'end' }}>
+                            <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.textMuted, marginBottom: 8, textTransform: 'uppercase' }}>Click tag or press key above (W/Y/G/O/B/P/R/U)</div>
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    {['WHITE','YELLOW','GREEN','ORANGE','BLUE','PINK','RED','UNTAGGED'].map(t => (
+                                        <button key={t} onClick={() => setScanTag(t)} style={{
+                                            padding: '8px 14px', borderRadius: 7,
+                                            border: scanTag === t ? `2px solid ${COLORS.primary}` : `1px solid ${COLORS.border}`,
+                                            background: scanTag === t ? COLORS.primary : TAG_COLORS[t] || '#ccc',
+                                            color: scanTag === t ? 'white' : (t === 'YELLOW' || t === 'WHITE' || t === 'UNTAGGED' ? '#333' : 'white'),
+                                            cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                                            boxShadow: scanTag === t ? '0 2px 8px rgba(139,26,74,0.4)' : 'none',
+                                        }}>
+                                            <span style={{ fontFamily: 'monospace', fontSize: 9, opacity: 0.7, marginRight: 4 }}>[{TAG_SHORTCUT_LABELS[t]}]</span>{t}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* MRP Override */}
+                            <div style={{ minWidth: 130 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, marginBottom: 6, textTransform: 'uppercase' }}>MRP Override</div>
+                                <input type="number" value={scanMrpOverride} onChange={e => setScanMrpOverride(e.target.value)}
+                                    placeholder={String(scanResult.mrp || '0')}
+                                    style={{ width: '100%', padding: '10px 12px', border: `2px solid ${scanMrpOverride ? COLORS.warning : COLORS.border}`, borderRadius: 8, fontSize: 14, fontWeight: 600, background: scanMrpOverride ? COLORS.warningBg : COLORS.bg }} />
+                                {scanMrpOverride && <div style={{ fontSize: 9, color: COLORS.warning, marginTop: 2 }}>⚠ Mismatch logged</div>}
+                            </div>
+
+                            {/* QTY */}
+                            <div style={{ minWidth: 90 }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: COLORS.text, marginBottom: 6, textTransform: 'uppercase' }}>Qty</div>
+                                <input type="number" min="1" value={scanQty} onChange={e => setScanQty(parseInt(e.target.value)||1)}
+                                    style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 8, fontSize: 16, fontWeight: 700, textAlign: 'center' }} />
+                            </div>
+
+                            {/* Add Button (mouse fallback) */}
+                            <button onClick={addScanItem} style={{
+                                padding: '11px 22px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 8,
+                                cursor: 'pointer', fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap',
+                                boxShadow: '0 4px 14px rgba(139,26,74,0.35)',
+                            }}>
+                                + ADD
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* LIVE AUDIT SUMMARY (auto-synced) */}
+            {scannedItems.length > 0 && (
+                <div style={{ background: COLORS.sidebar, borderRadius: 12, padding: '16px 20px', marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.gold, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
+                        ⚡ Live Audit Summary — Auto-Synced to Dashboard
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+                        {[
+                            { label: 'Scanned (pcs)', value: formatNumber(totalScannedPcs), color: COLORS.gold },
+                            { label: 'Unique SKUs', value: formatNumber(scannedItems.length), color: 'white' },
+                            { label: 'ERP Match', value: matchPct + '%', color: parseFloat(matchPct) > 90 ? '#4ade80' : '#fb923c' },
+                            { label: 'Non-ERP / Ghost', value: formatNumber(ghostCount), color: ghostCount > 0 ? '#fb923c' : '#4ade80' },
+                            { label: 'Live Variance', value: (liveVariance > 0 ? '+' : '') + formatNumber(liveVariance) + ' (' + liveVariancePct + '%)', color: liveVariance > 0 ? '#4ade80' : '#f87171' },
+                            { label: 'MRV Value', value: formatCurrency(totalMRV), color: COLORS.gold },
+                        ].map((m, i) => (
+                            <div key={i} style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: 10, color: '#888', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase' }}>{m.label}</div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: m.color }}>{m.value}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Scanned Items Table */}
+            {scannedItems.length > 0 && (
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 20px', borderBottom: `1px solid ${COLORS.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: COLORS.section }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>
+                            Scanned Items — {scannedItems.length} unique SKUs / {formatNumber(totalScannedPcs)} total pieces
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={downloadScanData} style={{ padding: '7px 14px', background: COLORS.success, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                                ⬇ Export Excel
+                            </button>
+                            <button onClick={() => {
+                                if (!window.confirm('Clear ALL scanned items? This cannot be undone.')) return;
+                                if (fbDb && sessionCode) {
+                                    fbDb.ref(`mugdha-audit/sessions/${sessionCode}/items`).remove();
+                                } else { setScannedItems([]); }
+                            }} style={{ padding: '7px 14px', background: COLORS.error, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                                ✕ Clear All
+                            </button>
+                        </div>
+                    </div>
+                    <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                                <tr style={{ background: COLORS.sidebar, color: 'white' }}>
+                                    {['#','Barcode','Qty','Colour Tag','MRP','CP','ERP Status','Vendor','Rack'].map(h => (
+                                        <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3, whiteSpace: 'nowrap' }}>{h}</th>
+                                    ))}
+                                    <th style={{ padding: '10px 12px' }}></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[...scannedItems].reverse().map((item, idx) => (
+                                    <tr key={item.id} style={{ borderBottom: `1px solid ${COLORS.borderLight}`, background: idx % 2 === 0 ? COLORS.bg : COLORS.section }}>
+                                        <td style={{ padding: '9px 12px', color: COLORS.textMuted, fontSize: 11 }}>{scannedItems.length - idx}</td>
+                                        <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontWeight: 600, color: COLORS.text, fontSize: 11 }}>{item.barcode}</td>
+                                        <td style={{ padding: '9px 12px', fontWeight: 700, color: COLORS.primary }}>{item.qty}</td>
+                                        <td style={{ padding: '9px 12px' }}>
+                                            <span style={{ background: TAG_COLORS[item.tagType] || '#ccc', color: (item.tagType === 'WHITE' || item.tagType === 'YELLOW') ? '#333' : 'white', padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700 }}>{item.tagType}</span>
+                                        </td>
+                                        <td style={{ padding: '9px 12px', fontWeight: 600, color: COLORS.text }}>{formatCurrency(item.mrp)}</td>
+                                        <td style={{ padding: '9px 12px', color: COLORS.textMuted }}>{formatCurrency(item.cp)}</td>
+                                        <td style={{ padding: '9px 12px' }}>
+                                            <span style={{ color: item.erpStatus === 'YES' ? COLORS.success : COLORS.error, fontWeight: 700, fontSize: 11 }}>
+                                                {item.erpStatus === 'YES' ? '✓ ERP' : '✗ Ghost'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '9px 12px', color: COLORS.textMuted, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.vendorErp || '—'}</td>
+                                        <td style={{ padding: '9px 12px', color: COLORS.textMuted }}>{item.rack || '—'}</td>
+                                        <td style={{ padding: '9px 12px' }}>
+                                            <button onClick={() => removeScannedItem(item.id)}
+                                                style={{ padding: '3px 8px', background: 'none', border: `1px solid ${COLORS.error}`, color: COLORS.error, borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>✕</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+        );
+    };
+
+    const renderSchedule = () => (
+        <div style={{ padding: 20 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 20 }}>Audit Schedule</h1>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Plan New Audit</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Outlet</label>
+                        <select value={scheduleForm.outlet} onChange={(e) => setScheduleForm({...scheduleForm, outlet: e.target.value})}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}>
+                            {stores.filter(s => s.active).map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
+                        </select>
+                    </div>
+                    <CalendarPicker label="Start Date" value={scheduleForm.startDate} onChange={(v) => setScheduleForm({...scheduleForm, startDate: v})} />
+                    <CalendarPicker label="End Date" value={scheduleForm.endDate} onChange={(v) => setScheduleForm({...scheduleForm, endDate: v})} />
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Status</label>
+                        <select value={scheduleForm.status} onChange={(e) => setScheduleForm({...scheduleForm, status: e.target.value})}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}>
+                            <option value="PLANNED">PLANNED</option>
+                            <option value="IN PROGRESS">IN PROGRESS</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Est. Size</label>
+                        <input type="number" value={scheduleForm.estSize} onChange={(e) => setScheduleForm({...scheduleForm, estSize: e.target.value})}
+                            placeholder="e.g. 500" style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                    </div>
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Team Members</label>
+                        <select multiple value={scheduleForm.team} onChange={(e) => setScheduleForm({...scheduleForm, team: Array.from(e.target.selectedOptions, opt => opt.value)})}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13, minHeight: 40 }}>
+                            {teamMembers.filter(m => m.active).map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <button onClick={() => { setSchedules([...schedules, {...scheduleForm, id: Date.now()}]); setScheduleForm({ outlet: 'TS-MG-KPHB', startDate: '', endDate: '', status: 'PLANNED', estSize: '', team: [] }); }}
+                    style={{ marginTop: 16, padding: '10px 24px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
+                    Add Schedule
+                </button>
+            </div>
+
+            {schedules.length > 0 && (
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Scheduled Audits</h3>
+                    <div style={{ display: 'grid', gap: 12 }}>
+                        {schedules.map(sched => (
+                            <div key={sched.id} style={{ background: COLORS.section, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <div style={{ fontWeight: 600, color: COLORS.text }}>{stores.find(s => s.code === sched.outlet)?.name}</div>
+                                    <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4 }}>{sched.startDate} to {sched.endDate} | Status: <span style={{ fontWeight: 600, color: sched.status === 'COMPLETED' ? COLORS.success : sched.status === 'IN PROGRESS' ? COLORS.warning : COLORS.info }}>{sched.status}</span></div>
+                                    <div style={{ fontSize: 11, color: COLORS.textLight, marginTop: 3 }}>Team: {sched.team.join(', ') || 'Unassigned'}</div>
+                                </div>
+                                <button onClick={() => setSchedules(schedules.filter(s => s.id !== sched.id))} style={{ padding: '6px 12px', background: COLORS.error, color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Remove</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    const renderUpload = () => (
+        <div style={{ padding: 20 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 20 }}>Upload Data</h1>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
+                {[
+                    { label: 'Consolidated Data', handler: async (f) => setConsolidatedData(await readExcelFile(f)), icon: '📊' },
+                    { label: 'ERP Stock', handler: async (f) => { const data = await readExcelFile(f); setErpStockData(data); setErpRefIndex(buildIndex(data, 'BARCODE')); }, icon: '📦' },
+                    { label: 'Sales Data', handler: async (f) => setSalesData(await readExcelFile(f)), icon: '💰' },
+                    { label: 'STN Inward', handler: async (f) => setStnInwardData(await readExcelFile(f)), icon: '📥' },
+                    { label: 'STN Outward', handler: async (f) => setStnOutwardData(await readExcelFile(f)), icon: '📤' },
+                    { label: 'Returns Data', handler: async (f) => setReturnsData(await readExcelFile(f)), icon: '↩️' },
+                ].map((item, idx) => (
+                    <label key={idx} style={{ cursor: 'pointer' }}>
+                        <input type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files[0] && item.handler(e.target.files[0])} style={{ display: 'none' }} />
+                        <div style={{ background: COLORS.card, border: `2px dashed ${COLORS.primary}`, borderRadius: 8, padding: 24, textAlign: 'center', transition: 'all 0.3s' }}>
+                            <div style={{ fontSize: 32, marginBottom: 8 }}>{item.icon}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{item.label}</div>
+                            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>Click to upload</div>
+                        </div>
+                    </label>
+                ))}
+            </div>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Reference Data Upload (Optional)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+                    <label style={{ cursor: 'pointer' }}>
+                        <input type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files[0] && (async () => { const data = await readExcelFile(e.target.files[0]); setErpRefData(data); setErpRefIndex(buildIndex(data, 'BARCODE')); })()}  style={{ display: 'none' }} />
+                        <div style={{ padding: '10px 12px', background: COLORS.section, border: `1px solid ${COLORS.border}`, borderRadius: 6, textAlign: 'center', fontSize: 12, fontWeight: 600, color: COLORS.text, cursor: 'pointer' }}>
+                            📋 ERP Reference
+                        </div>
+                    </label>
+                    <label style={{ cursor: 'pointer' }}>
+                        <input type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files[0] && (async () => { const data = await readExcelFile(e.target.files[0]); setQrd3RefData(data); setQrd3RefIndex(buildIndex(data, 'BARCODE')); })()}  style={{ display: 'none' }} />
+                        <div style={{ padding: '10px 12px', background: COLORS.section, border: `1px solid ${COLORS.border}`, borderRadius: 6, textAlign: 'center', fontSize: 12, fontWeight: 600, color: COLORS.text, cursor: 'pointer' }}>
+                            📋 QRD3 Reference
+                        </div>
+                    </label>
+                    <label style={{ cursor: 'pointer' }}>
+                        <input type="file" accept=".xlsx,.xls" onChange={(e) => e.target.files[0] && (async () => { const data = await readExcelFile(e.target.files[0]); setFocusMrnRefData(data); setFocusMrnRefIndex(buildIndex(data, 'BARCODE')); })()}  style={{ display: 'none' }} />
+                        <div style={{ padding: '10px 12px', background: COLORS.section, border: `1px solid ${COLORS.border}`, borderRadius: 6, textAlign: 'center', fontSize: 12, fontWeight: 600, color: COLORS.text, cursor: 'pointer' }}>
+                            📋 Focus MRN Reference
+                        </div>
+                    </label>
+                </div>
+
+                <div style={{ background: COLORS.infoBg, border: `1px solid ${COLORS.info}`, borderRadius: 6, padding: 12, fontSize: 12, color: COLORS.text }}>
+                    <strong>Upload Status:</strong>
+                    <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.6 }}>
+                        • Consolidated: {consolidatedData.length > 0 ? `${consolidatedData.length} rows ✓` : 'Pending'}<br />
+                        • ERP Stock: {erpStockData.length > 0 ? `${erpStockData.length} rows ✓` : 'Pending'}<br />
+                        • Sales: {salesData.length > 0 ? `${salesData.length} rows ✓` : 'Pending'}<br />
+                        • STN In/Out: {stnInwardData.length > 0 ? `In: ${stnInwardData.length} ✓` : 'Pending'} | {stnOutwardData.length > 0 ? `Out: ${stnOutwardData.length} ✓` : 'Pending'}<br />
+                        • Returns: {returnsData.length > 0 ? `${returnsData.length} rows ✓` : 'Pending'}<br />
+                        • References: ERP {erpRefIndex.size > 0 ? '✓' : '✗'} | QRD3 {qrd3RefIndex.size > 0 ? '✓' : '✗'} | MRN {focusMrnRefIndex.size > 0 ? '✓' : '✗'}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderProgress = () => (
+        <div style={{ padding: 20 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 20 }}>Progress Tracking</h1>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Audit Parameters</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Opening Stock (ERP)</label>
+                        <input type="number" value={openingStockErp} onChange={(e) => setOpeningStockErp(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                    </div>
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Non-Barcode Items</label>
+                        <input type="number" value={nonBarcodeItems} onChange={(e) => setNonBarcodeItems(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                    </div>
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Store Manager</label>
+                        <input type="text" value={storeManagerName} onChange={(e) => setStoreManagerName(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                    </div>
+                    <CalendarPicker label="Audit Start Date" value={auditStartDate} onChange={setAuditStartDate} />
+                    <CalendarPicker label="Audit End Date" value={auditEndDate} onChange={setAuditEndDate} />
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Last Audit Closing Stock</label>
+                        <input type="number" value={lastAuditClosingStock} onChange={(e) => setLastAuditClosingStock(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                    </div>
+                </div>
+                <div style={{ marginTop: 16 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Audit Notes</label>
+                    <textarea value={auditNotes} onChange={(e) => setAuditNotes(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13, minHeight: 80, fontFamily: 'monospace' }} />
+                </div>
+            </div>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Daily Logs</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 200px auto', gap: 10, marginBottom: 16, alignItems: 'end' }}>
+                    <CalendarPicker label="Date" value={newLogEntry.date} onChange={(v) => setNewLogEntry({...newLogEntry, date: v})} />
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Description</label>
+                        <input type="text" value={newLogEntry.description} onChange={(e) => setNewLogEntry({...newLogEntry, description: e.target.value})}
+                            placeholder="e.g. Floor sweep completed" style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                    </div>
+                    <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Items Count</label>
+                        <input type="number" value={newLogEntry.items} onChange={(e) => setNewLogEntry({...newLogEntry, items: e.target.value})}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                    </div>
+                    <button onClick={() => { setDailyLogs([...dailyLogs, {...newLogEntry, id: Date.now()}]); setNewLogEntry({ date: '', description: '', items: '' }); }}
+                        style={{ padding: '10px 16px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+                        Add Log
+                    </button>
+                </div>
+                {dailyLogs.length > 0 && (
+                    <div>
+                        {dailyLogs.map(log => (
+                            <div key={log.id} style={{ background: COLORS.section, padding: 10, borderRadius: 6, marginBottom: 8, fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div><strong>{log.date}</strong> - {log.description} ({log.items} items)</div>
+                                <button onClick={() => setDailyLogs(dailyLogs.filter(l => l.id !== log.id))} style={{ padding: '4px 8px', background: COLORS.error, color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Delete</button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    const renderAnalysis = () => (
+        <div style={{ padding: 20 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 20 }}>Analysis</h1>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
+                {[
+                    { label: 'Physical Count', value: formatNumber(calculations.physicalCount), color: COLORS.info },
+                    { label: 'ERP Adjusted', value: formatNumber(calculations.erpAdjusted), color: COLORS.primary },
+                    { label: 'Method 1 Variance', value: `${formatNumber(calculations.variance)} (${calculations.variancePercent.toFixed(1)}%)`, color: calculations.variancePercent > 0 ? COLORS.error : COLORS.success },
+                    { label: 'Method 2 Variance', value: `${formatNumber(calculations.variance2)} (${calculations.variancePercent2.toFixed(1)}%)`, color: calculations.variancePercent2 > 0 ? COLORS.error : COLORS.success },
+                    { label: 'Match Rate', value: calculations.matchRate.toFixed(1) + '%', color: COLORS.success },
+                    { label: 'MRV Value', value: formatCurrency(calculations.mrvValue), color: COLORS.primary },
+                ].map((metric, idx) => (
+                    <div key={idx} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, marginBottom: 8 }}>{metric.label}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: metric.color }}>{metric.value}</div>
+                    </div>
+                ))}
+            </div>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Category-wise Sales Breakdown</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                    {Object.entries(calculations.categories).length > 0 ? (
+                        Object.entries(calculations.categories).map(([cat, data]) => (
+                            <div key={cat} style={{ background: COLORS.section, borderRadius: 8, padding: 12, border: `1px solid ${COLORS.border}` }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>{cat}</div>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.primary }}>{data.count}</div>
+                                <div style={{ fontSize: 11, color: COLORS.textLight, marginTop: 4 }}>Qty: {data.qty} | Value: {formatCurrency(data.value)}</div>
+                            </div>
+                        ))
+                    ) : (
+                        <div style={{ gridColumn: '1 / -1', color: COLORS.textMuted, fontSize: 12 }}>No sales data uploaded yet.</div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderShrinkage = () => (
+        <div style={{ padding: 20 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 20 }}>Shrinkage Report</h1>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
+                {[
+                    { label: 'Shrinkage (Units)', value: calculations.shrinkagePieces, color: COLORS.error },
+                    { label: 'Shrinkage Rate', value: calculations.shrinkageRate.toFixed(2) + '%', color: COLORS.error },
+                    { label: 'Risk Rating', value: calculations.riskRating, color: calculations.riskRating === 'CRITICAL' ? COLORS.error : calculations.riskRating === 'HIGH' ? COLORS.warning : COLORS.success },
+                    { label: 'Ghost Stock', value: calculations.ghostStock, color: COLORS.warning },
+                ].map((metric, idx) => (
+                    <div key={idx} style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                        <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 600, marginBottom: 8 }}>{metric.label}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: metric.color }}>{metric.value}</div>
+                    </div>
+                ))}
+            </div>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Risk Thresholds (Adjustable)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+                    {[
+                        { key: 'low', label: 'Low Risk (%)' },
+                        { key: 'medium', label: 'Medium Risk (%)' },
+                        { key: 'high', label: 'High Risk (%)' },
+                    ].map(threshold => (
+                        <div key={threshold.key}>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>{threshold.label}</label>
+                            <input type="number" value={riskThresholds[threshold.key]} onChange={(e) => setRiskThresholds({...riskThresholds, [threshold.key]: parseFloat(e.target.value) || 0})}
+                                style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Issues & Observations</h3>
+                <div style={{ marginBottom: 16 }}>
+                    <input type="text" value={newObservation} onChange={(e) => setNewObservation(e.target.value)} onKeyPress={(e) => { if (e.key === 'Enter' && newObservation) { setObservations([...observations, {id: Date.now(), text: newObservation}]); setNewObservation(''); } }}
+                        placeholder="Add observation..." style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13, marginBottom: 10 }} />
+                    <button onClick={() => { if (newObservation) { setObservations([...observations, {id: Date.now(), text: newObservation}]); setNewObservation(''); } }}
+                        style={{ padding: '8px 16px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                        Add Observation
+                    </button>
+                </div>
+                {observations.length > 0 && (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                        {observations.map(obs => (
+                            <div key={obs.id} style={{ background: COLORS.warningBg, border: `1px solid ${COLORS.warning}`, borderRadius: 6, padding: 10, fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: COLORS.text }}>{obs.text}</span>
+                                <button onClick={() => setObservations(observations.filter(o => o.id !== obs.id))} style={{ padding: '4px 8px', background: COLORS.error, color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}>Delete</button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    // ─── PROFESSIONAL REPORT GENERATORS ────────────────────────────────────────
+
+    const outletName = stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet;
+    const avgMRP = calculations.physicalCount > 0 ? calculations.mrvValue / calculations.physicalCount : 0;
+    const avgCP  = calculations.physicalCount > 0 ? calculations.cpValue  / calculations.physicalCount : 0;
+    const shrinkageValueMRP = calculations.shrinkagePieces * avgMRP;
+    const shrinkageValueCP  = calculations.shrinkagePieces * avgCP;
+
+    const generatePDFReport = () => {
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const W = 210, ML = 14, MR = 196, maroon = [139, 26, 74];
+
+            // ── Cover header ──────────────────────────────────────────────────
+            doc.setFillColor(...maroon);
+            doc.rect(0, 0, W, 38, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(18); doc.setFont('helvetica', 'bold');
+            doc.text('MUGDHA ART STUDIO LLP', ML, 16);
+            doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+            doc.text('Internal Audit Report  |  Reg: AAM-6356', ML, 24);
+            doc.setFontSize(9);
+            doc.text(`Outlet: ${outletName}   |   Period: ${auditStartDate || 'N/A'} – ${auditEndDate || 'N/A'}   |   Prepared: ${new Date().toLocaleDateString('en-IN')}`, ML, 32);
+
+            // Gold divider
+            doc.setFillColor(201, 168, 76);
+            doc.rect(0, 38, W, 2, 'F');
+
+            // ── Section 1: Executive Summary ──────────────────────────────────
+            let y = 48;
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+            doc.text('1. EXECUTIVE SUMMARY', ML, y); y += 8;
+
+            const riskColor = calculations.riskRating === 'CRITICAL' ? [185,28,28] : calculations.riskRating === 'HIGH' ? [180,83,9] : calculations.riskRating === 'MEDIUM' ? [161,98,7] : [21,128,61];
+            doc.autoTable({
+                startY: y,
+                margin: { left: ML, right: 14 },
+                theme: 'grid',
+                headStyles: { fillColor: maroon, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+                styles: { fontSize: 9, cellPadding: 3 },
+                alternateRowStyles: { fillColor: [250, 248, 245] },
+                head: [['Metric', 'Value', 'Metric', 'Value']],
+                body: [
+                    ['Physical Count', formatNumber(calculations.physicalCount), 'ERP Adjusted Expected', formatNumber(calculations.erpAdjusted)],
+                    ['Variance (Pieces)', formatNumber(calculations.variance), 'Variance %', calculations.variancePercent.toFixed(2) + '%'],
+                    ['ERP Matched', formatNumber(calculations.erpMatched), 'Ghost Stock (Not in ERP)', formatNumber(calculations.ghostStock)],
+                    ['ERP Match Rate', calculations.matchRate.toFixed(2) + '%', 'Stock MRP Value', formatCurrency(calculations.mrvValue)],
+                    ['Shrinkage (Pieces)', formatNumber(calculations.shrinkagePieces), 'Shrinkage %', calculations.shrinkageRate.toFixed(2) + '%'],
+                    ['Shrinkage Value (MRP)', formatCurrency(shrinkageValueMRP), 'Shrinkage Value (CP)', formatCurrency(shrinkageValueCP)],
+                    ['Risk Rating', calculations.riskRating, 'Industry Benchmark', '0.5% – 1.5%'],
+                ],
+            });
+            y = doc.lastAutoTable.finalY + 10;
+
+            // ── Section 2: Method 1 Reconciliation ───────────────────────────
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+            doc.text('2. METHOD 1 — ERP vs PHYSICAL RECONCILIATION', ML, y); y += 6;
+            doc.autoTable({
+                startY: y, margin: { left: ML, right: 14 }, theme: 'grid',
+                headStyles: { fillColor: maroon, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+                styles: { fontSize: 9, cellPadding: 3 },
+                alternateRowStyles: { fillColor: [250, 248, 245] },
+                head: [['Line Item', 'Pieces']],
+                body: [
+                    ['Opening Stock (ERP)', formatNumber(calculations.erpOpening)],
+                    ['(+) STN Inward', formatNumber(calculations.stnInQty)],
+                    ['(–) STN Outward', formatNumber(calculations.stnOutQty)],
+                    ['(+) Sales Returns', formatNumber(calculations.returnsQty)],
+                    ['(–) Sales', formatNumber(calculations.salesQty)],
+                    ['= ERP Adjusted Expected Stock', formatNumber(calculations.erpAdjusted)],
+                    ['Physical Count (Scanned + Non-Barcode)', formatNumber(calculations.physicalCount)],
+                    ['= VARIANCE', formatNumber(calculations.variance) + '  (' + calculations.variancePercent.toFixed(2) + '%)'],
+                ],
+                didParseCell: (data) => {
+                    if (data.row.index === 5 || data.row.index === 7) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fillColor = data.row.index === 7
+                            ? (calculations.variance >= 0 ? [220, 252, 231] : [254, 226, 226])
+                            : [240, 253, 244];
+                    }
+                }
+            });
+            y = doc.lastAutoTable.finalY + 10;
+
+            // ── Section 3: Method 2 (if not first time) ───────────────────────
+            if (!firstTimeAudit) {
+                if (y > 240) { doc.addPage(); y = 20; }
+                doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+                doc.text('3. METHOD 2 — LAST AUDIT RECONCILIATION', ML, y); y += 6;
+                doc.autoTable({
+                    startY: y, margin: { left: ML, right: 14 }, theme: 'grid',
+                    headStyles: { fillColor: [70, 70, 70], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+                    styles: { fontSize: 9, cellPadding: 3 },
+                    alternateRowStyles: { fillColor: [250, 248, 245] },
+                    head: [['Line Item', 'Pieces']],
+                    body: [
+                        ['Last Audited Closing Stock', formatNumber(parseInt(lastAuditClosingStock) || 0)],
+                        ['(+) STN Inward', formatNumber(calculations.stnInQty)],
+                        ['(–) STN Outward', formatNumber(calculations.stnOutQty)],
+                        ['(+) Sales Returns', formatNumber(calculations.returnsQty)],
+                        ['(–) Sales', formatNumber(calculations.salesQty)],
+                        ['= Expected Stock (Method 2)', formatNumber(calculations.expected2)],
+                        ['Physical Count', formatNumber(calculations.physicalCount)],
+                        ['= VARIANCE (Method 2)', formatNumber(calculations.variance2) + '  (' + calculations.variancePercent2.toFixed(2) + '%)'],
+                    ],
+                    didParseCell: (data) => {
+                        if (data.row.index === 5 || data.row.index === 7) {
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                    }
+                });
+                y = doc.lastAutoTable.finalY + 10;
+            }
+
+            // ── Section 4: Shrinkage Analysis ────────────────────────────────
+            if (y > 220) { doc.addPage(); y = 20; }
+            const secNum = firstTimeAudit ? 3 : 4;
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+            doc.text(`${secNum}. SHRINKAGE & RISK ANALYSIS`, ML, y); y += 6;
+
+            doc.autoTable({
+                startY: y, margin: { left: ML, right: 14 }, theme: 'grid',
+                headStyles: { fillColor: maroon, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+                styles: { fontSize: 9, cellPadding: 3 },
+                alternateRowStyles: { fillColor: [250, 248, 245] },
+                head: [['Shrinkage Metric', 'Value', 'Benchmark / Note']],
+                body: [
+                    ['Shrinkage (Pieces)', formatNumber(calculations.shrinkagePieces), 'Physical < ERP Adjusted'],
+                    ['Shrinkage Rate (%)', calculations.shrinkageRate.toFixed(2) + '%', 'Industry: 0.5% – 1.5%'],
+                    ['Shrinkage Value at MRP', formatCurrency(shrinkageValueMRP), `Avg MRP: ${formatCurrency(avgMRP)}`],
+                    ['Shrinkage Value at Cost', formatCurrency(shrinkageValueCP), `Avg CP: ${formatCurrency(avgCP)}`],
+                    ['Risk Rating', calculations.riskRating, calculations.riskRating === 'CRITICAL' ? '>10%' : calculations.riskRating === 'HIGH' ? '5-10%' : calculations.riskRating === 'MEDIUM' ? '3-5%' : '<3%'],
+                    ['Stock MRP Value (Physical)', formatCurrency(calculations.mrvValue), 'Sum of PHY QTY × MRP'],
+                    ['Stock CP Value (Physical)', formatCurrency(calculations.cpValue), 'Sum of PHY QTY × CP'],
+                ],
+                didParseCell: (data) => {
+                    if (data.row.index === 4 && data.column.index === 1) {
+                        data.cell.styles.textColor = riskColor;
+                        data.cell.styles.fontStyle = 'bold';
+                    }
+                }
+            });
+            y = doc.lastAutoTable.finalY + 10;
+
+            // ── Section 5: Tag Distribution ───────────────────────────────────
+            if (Object.keys(calculations.tagDistribution).length > 0) {
+                if (y > 220) { doc.addPage(); y = 20; }
+                doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+                doc.text(`${secNum + 1}. COLOUR TAG DISTRIBUTION`, ML, y); y += 6;
+                const totalQty = calculations.physicalCount || 1;
+                const tagRows = Object.entries(calculations.tagDistribution).map(([tag, d]) => [
+                    tag, formatNumber(d.count), formatNumber(d.qty),
+                    formatCurrency(d.mrvValue), ((d.qty / totalQty) * 100).toFixed(1) + '%'
+                ]);
+                doc.autoTable({
+                    startY: y, margin: { left: ML, right: 14 }, theme: 'grid',
+                    headStyles: { fillColor: maroon, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+                    styles: { fontSize: 9, cellPadding: 3 },
+                    alternateRowStyles: { fillColor: [250, 248, 245] },
+                    head: [['Tag Colour', 'Barcode Count', 'Physical Qty', 'MRP Value', '% of Total']],
+                    body: tagRows,
+                });
+                y = doc.lastAutoTable.finalY + 10;
+            }
+
+            // ── Root Cause & Recommendations ──────────────────────────────────
+            if (y > 230) { doc.addPage(); y = 20; }
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+            doc.text(`${secNum + 2}. ROOT CAUSE ANALYSIS & RECOMMENDATIONS`, ML, y); y += 7;
+            doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+            const rootCauses = [
+                '1. SYSTEM MIGRATION: Three sequential migrations (Legacy → Focus ERP → Mugdha POS) introduced data mapping gaps and inflated ERP opening stock figures. Variances are partly attributable to historical carryover — not current operations.',
+                '2. CENTRALISATION TRANSITION (Dec 2025): Warehouse centralisation involved STN movements across outlets. Timing mismatches between physical dispatch and ERP recording create apparent discrepancies.',
+                '3. GHOST STOCK: ' + formatNumber(calculations.ghostStock) + ' barcodes exist physically but are absent from ERP. These represent un-reconciled items from migration-era purchases.',
+                '4. STAFF NOTE: Discrepancies are NOT attributed to store staff. Findings stem from systemic factors. Outlet teams have co-operated fully with the audit process.',
+            ];
+            rootCauses.forEach(line => {
+                const wrapped = doc.splitTextToSize(line, MR - ML);
+                doc.text(wrapped, ML, y);
+                y += wrapped.length * 5 + 3;
+            });
+
+            // ── Footer on all pages ───────────────────────────────────────────
+            const totalPages = doc.getNumberOfPages();
+            for (let p = 1; p <= totalPages; p++) {
+                doc.setPage(p);
+                doc.setFillColor(...maroon);
+                doc.rect(0, 286, W, 11, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(8);
+                doc.text('MUGDHA ART STUDIO LLP | Internal Audit Department | CONFIDENTIAL', ML, 293);
+                doc.text(`Page ${p} of ${totalPages}`, MR - 20, 293);
+            }
+
+            doc.save(`Audit_Report_${selectedOutlet}_${new Date().toISOString().slice(0,10)}.pdf`);
+        } catch (err) {
+            console.error(err);
+            alert('PDF generation error: ' + err.message);
+        }
+    };
+
+    const generateExcelWorkbook = () => {
+        try {
+            const wb = XLSX.utils.book_new();
+
+            // Sheet 1: Summary
+            const sumData = [
+                ['MUGDHA ART STUDIO LLP — INTERNAL AUDIT REPORT'],
+                ['Outlet', outletName],
+                ['Audit Period', `${auditStartDate} to ${auditEndDate}`],
+                ['Store Manager', storeManagerName],
+                ['Report Date', new Date().toLocaleDateString('en-IN')],
+                [],
+                ['RECONCILIATION SUMMARY'],
+                ['Metric', 'Value'],
+                ['Physical Count', calculations.physicalCount],
+                ['ERP Adjusted Expected', calculations.erpAdjusted],
+                ['Variance (Pieces)', calculations.variance],
+                ['Variance %', calculations.variancePercent.toFixed(2) + '%'],
+                ['ERP Matched', calculations.erpMatched],
+                ['Ghost Stock (Not in ERP)', calculations.ghostStock],
+                ['ERP Match Rate %', calculations.matchRate.toFixed(2) + '%'],
+                [],
+                ['SHRINKAGE ANALYSIS'],
+                ['Shrinkage Pieces', calculations.shrinkagePieces],
+                ['Shrinkage Rate %', calculations.shrinkageRate.toFixed(2) + '%'],
+                ['Stock MRP Value (Physical)', calculations.mrvValue],
+                ['Stock CP Value (Physical)', calculations.cpValue],
+                ['Shrinkage Value at MRP', shrinkageValueMRP],
+                ['Shrinkage Value at Cost Price', shrinkageValueCP],
+                ['Average MRP per piece', Math.round(avgMRP)],
+                ['Average CP per piece', Math.round(avgCP)],
+                ['Risk Rating', calculations.riskRating],
+                ['Industry Benchmark', '0.5% - 1.5%'],
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumData), 'Summary');
+
+            // Sheet 2: Method 1 Reconciliation
+            const m1Data = [
+                ['METHOD 1 — ERP vs PHYSICAL RECONCILIATION'],
+                ['Line Item', 'Pieces'],
+                ['Opening Stock (ERP)', calculations.erpOpening],
+                ['(+) STN Inward', calculations.stnInQty],
+                ['(-) STN Outward', calculations.stnOutQty],
+                ['(+) Sales Returns', calculations.returnsQty],
+                ['(-) Sales', calculations.salesQty],
+                ['= ERP Adjusted Expected', calculations.erpAdjusted],
+                ['Physical Count (Scanned + Non-Barcode)', calculations.physicalCount],
+                ['= VARIANCE', calculations.variance],
+                ['Variance %', calculations.variancePercent.toFixed(2) + '%'],
+            ];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(m1Data), 'Method 1 Reconciliation');
+
+            // Sheet 3: Method 2 (if applicable)
+            if (!firstTimeAudit) {
+                const m2Data = [
+                    ['METHOD 2 — LAST AUDIT RECONCILIATION'],
+                    ['Line Item', 'Pieces'],
+                    ['Last Audited Closing Stock', parseInt(lastAuditClosingStock) || 0],
+                    ['(+) STN Inward', calculations.stnInQty],
+                    ['(-) STN Outward', calculations.stnOutQty],
+                    ['(+) Sales Returns', calculations.returnsQty],
+                    ['(-) Sales', calculations.salesQty],
+                    ['= Expected Stock (Method 2)', calculations.expected2],
+                    ['Physical Count', calculations.physicalCount],
+                    ['= VARIANCE (Method 2)', calculations.variance2],
+                    ['Variance % (Method 2)', calculations.variancePercent2.toFixed(2) + '%'],
+                ];
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(m2Data), 'Method 2 Reconciliation');
+            }
+
+            // Sheet 4: Tag Distribution
+            const tagHeader = [['Colour Tag', 'Barcode Count', 'Physical Qty', 'MRP Value (INR)', 'CP Value (INR)', '% of Total Qty']];
+            const totalQty = calculations.physicalCount || 1;
+            const tagRows = Object.entries(calculations.tagDistribution).map(([tag, d]) => [
+                tag, d.count, d.qty, Math.round(d.mrvValue),
+                Math.round(d.qty * avgCP), +((d.qty / totalQty) * 100).toFixed(2)
+            ]);
+            tagRows.push(['TOTAL', Object.values(calculations.tagDistribution).reduce((s, d) => s + d.count, 0),
+                calculations.physicalScanned, Math.round(calculations.mrvValue), Math.round(calculations.cpValue), 100]);
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([...tagHeader, ...tagRows]), 'Tag Distribution');
+
+            // Sheet 5: Ghost Stock (ALL items not in ERP)
+            const ghostItems = effectiveConsolidatedData.filter(r => r['ERP STATUS'] === 'NOT PART OF ERP');
+            const ghostHeader = [['S.No', 'Barcode', 'PHY QTY', 'Tag Type', 'MRP', 'Vendor Details']];
+            const ghostRows = ghostItems.map((r, i) => [
+                i + 1, r.BARCODE || r.Barcode, r['PHY QTY'] || 1,
+                r['TAG TYPE'] || '', r.MRP || 0, r['VENDOR DETAILS'] || ''
+            ]);
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([...ghostHeader, ...ghostRows]), 'Ghost Stock');
+
+            // Sheet 6: Sales Category (if data exists)
+            if (Object.keys(calculations.categories).length > 0) {
+                const catHeader = [['Category', 'Transactions', 'Qty Sold', 'MRP Value (INR)']];
+                const catRows = Object.entries(calculations.categories).map(([cat, d]) => [cat, d.count, d.qty, Math.round(d.value)]);
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([...catHeader, ...catRows]), 'Sales by Category');
+            }
+
+            XLSX.writeFile(wb, `Audit_Report_${selectedOutlet}_${new Date().toISOString().slice(0,10)}.xlsx`);
+        } catch (err) {
+            console.error(err);
+            alert('Excel generation error: ' + err.message);
+        }
+    };
+
+    const generateAcknowledgmentPDF = () => {
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const W = 210, ML = 20, MR = 190, maroon = [139, 26, 74];
+
+            // Header
+            doc.setFillColor(...maroon);
+            doc.rect(0, 0, W, 30, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+            doc.text('MUGDHA ART STUDIO LLP', ML, 13);
+            doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+            doc.text('STOCK VERIFICATION ACKNOWLEDGMENT', ML, 21);
+            doc.setFillColor(201, 168, 76);
+            doc.rect(0, 30, W, 1.5, 'F');
+
+            doc.setTextColor(0, 0, 0);
+            let y = 42;
+
+            // Store details
+            doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+            doc.text('AUDIT DETAILS', ML, y); y += 6;
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+            [
+                ['Outlet', outletName],
+                ['Store Manager', storeManagerName || '___________________________'],
+                ['Audit Period', `${auditStartDate || '___________'} to ${auditEndDate || '___________'}`],
+                ['Date of Signing', new Date().toLocaleDateString('en-IN')],
+            ].forEach(([label, val]) => {
+                doc.setFont('helvetica', 'bold'); doc.text(label + ':', ML, y);
+                doc.setFont('helvetica', 'normal'); doc.text(val, ML + 45, y);
+                y += 7;
+            });
+
+            y += 5;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+            doc.text('KEY FINDINGS', ML, y); y += 6;
+
+            doc.autoTable({
+                startY: y, margin: { left: ML, right: 20 }, theme: 'grid',
+                headStyles: { fillColor: maroon, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+                styles: { fontSize: 9, cellPadding: 3 },
+                alternateRowStyles: { fillColor: [250, 248, 245] },
+                head: [['Finding', 'Value']],
+                body: [
+                    ['Physical Count', formatNumber(calculations.physicalCount)],
+                    ['ERP Adjusted Expected', formatNumber(calculations.erpAdjusted)],
+                    ['Variance (Pieces)', formatNumber(calculations.variance) + ' (' + calculations.variancePercent.toFixed(2) + '%)'],
+                    ['Shrinkage (Pieces)', formatNumber(calculations.shrinkagePieces)],
+                    ['Shrinkage Rate', calculations.shrinkageRate.toFixed(2) + '%'],
+                    ['Shrinkage Value at MRP', formatCurrency(shrinkageValueMRP)],
+                    ['Risk Rating', calculations.riskRating],
+                ],
+            });
+
+            y = doc.lastAutoTable.finalY + 10;
+
+            // Declaration
+            doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+            doc.text('DECLARATION', ML, y); y += 7;
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+            const declaration = [
+                '1. Physical stock verification has been conducted at the above outlet as per standard internal audit procedures.',
+                '2. All barcode-tagged and non-barcode items have been counted and reconciled.',
+                '3. The findings presented are accurate to the best of our knowledge as of the audit date.',
+                '4. Discrepancies identified are noted and root cause analysis has been performed.',
+                '5. Any variances are attributable to system migration effects (Legacy → Focus ERP → Mugdha POS) and not to store staff.',
+            ];
+            declaration.forEach(line => {
+                const wrapped = doc.splitTextToSize(line, MR - ML);
+                doc.text(wrapped, ML, y);
+                y += wrapped.length * 5 + 2;
+            });
+
+            y += 12;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+            doc.text('SIGNATURES', ML, y); y += 10;
+
+            const sigBoxes = [
+                ['Store Manager', storeManagerName || ''],
+                ['Internal Audit Lead', 'Ram'],
+                ['Operations Head', 'Shetty Sir'],
+                ['Management', ''],
+            ];
+
+            sigBoxes.forEach((sig, idx) => {
+                const col = idx % 2 === 0 ? ML : 115;
+                if (idx % 2 === 0 && idx > 0) y += 28;
+                doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+                doc.text('Name: ' + sig[1], col, y);
+                doc.line(col, y + 14, col + 75, y + 14);
+                doc.setFontSize(8); doc.text('Date: ___________', col, y + 20);
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+                doc.text(sig[0], col, y + 26);
+            });
+
+            // Footer
+            doc.setFillColor(...maroon);
+            doc.rect(0, 286, W, 11, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(8);
+            doc.text('MUGDHA ART STUDIO LLP | Internal Audit Department | CONFIDENTIAL', ML, 293);
+            doc.text('Page 1 of 1', MR - 20, 293);
+
+            doc.save(`Acknowledgment_${selectedOutlet}_${new Date().toISOString().slice(0,10)}.pdf`);
+        } catch (err) {
+            console.error(err);
+            alert('Acknowledgment PDF error: ' + err.message);
+        }
+    };
+
+    // ─── REPORTS TAB ────────────────────────────────────────────────────────────
+    const renderReports = () => (
+        <div style={{ padding: 24 }}>
+            <h1 style={{ fontSize: 26, fontWeight: 700, color: COLORS.text, marginBottom: 6 }}>Reports</h1>
+            <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 24 }}>
+                Outlet: <strong>{outletName}</strong>  |  Period: <strong>{auditStartDate || '—'} to {auditEndDate || '—'}</strong>
+            </div>
+
+            {/* Download cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, marginBottom: 28 }}>
+                {[
+                    {
+                        title: 'Full Audit Report', sub: 'PDF',
+                        desc: 'Executive summary, Method 1 & 2 reconciliation, shrinkage analysis, tag distribution, root cause analysis. Professional letterhead.',
+                        badge: 'PDF', badgeColor: '#b91c1c', fn: generatePDFReport,
+                        accent: '#8B1A4A'
+                    },
+                    {
+                        title: 'Audit Data Workbook', sub: 'XLSX',
+                        desc: '6-sheet Excel workbook: Summary, Method 1, Method 2, Tag Distribution, Ghost Stock, Sales Categories.',
+                        badge: 'XLSX', badgeColor: '#15803d', fn: generateExcelWorkbook,
+                        accent: '#15803d'
+                    },
+                    {
+                        title: 'Acknowledgment Form', sub: 'PDF',
+                        desc: 'Printable sign-off document with key findings table, declaration and 4 signature blocks.',
+                        badge: 'PDF', badgeColor: '#1d4ed8', fn: generateAcknowledgmentPDF,
+                        accent: '#1d4ed8'
+                    },
+                ].map((card, idx) => (
+                    <div key={idx} onClick={card.fn} style={{
+                        background: COLORS.card, border: `1px solid ${COLORS.border}`,
+                        borderTop: `4px solid ${card.accent}`,
+                        borderRadius: 10, padding: 24, cursor: 'pointer',
+                        transition: 'box-shadow 0.2s',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.13)'}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>{card.title}</div>
+                            <div style={{ background: card.badgeColor, color: 'white', borderRadius: 5, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>{card.badge}</div>
+                        </div>
+                        <div style={{ fontSize: 12, color: COLORS.textMuted, lineHeight: 1.6, marginBottom: 18 }}>{card.desc}</div>
+                        <div style={{ padding: '9px 18px', background: card.accent, color: 'white', borderRadius: 6, fontSize: 13, fontWeight: 700, textAlign: 'center' }}>
+                            Download {card.sub}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Live preview of key numbers */}
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Report Data Preview</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                    {[
+                        ['Physical Count', formatNumber(calculations.physicalCount)],
+                        ['ERP Adjusted Expected', formatNumber(calculations.erpAdjusted)],
+                        ['Variance (Pieces)', formatNumber(calculations.variance) + ' (' + calculations.variancePercent.toFixed(2) + '%)'],
+                        ['ERP Match Rate', calculations.matchRate.toFixed(1) + '%'],
+                        ['Shrinkage (Pieces)', formatNumber(calculations.shrinkagePieces)],
+                        ['Shrinkage Rate', calculations.shrinkageRate.toFixed(2) + '%'],
+                        ['Shrinkage Value (MRP)', formatCurrency(shrinkageValueMRP)],
+                        ['Shrinkage Value (Cost)', formatCurrency(shrinkageValueCP)],
+                        ['Stock MRP Value', formatCurrency(calculations.mrvValue)],
+                        ['Risk Rating', calculations.riskRating],
+                    ].map(([label, val], idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 6, background: idx % 2 === 0 ? COLORS.section : COLORS.bg, border: `1px solid ${COLORS.borderLight}` }}>
+                            <span style={{ fontSize: 12, color: COLORS.textMuted, fontWeight: 600 }}>{label}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: label === 'Risk Rating' ? (calculations.riskRating === 'CRITICAL' ? COLORS.error : calculations.riskRating === 'HIGH' ? COLORS.warning : COLORS.success) : COLORS.text }}>{val}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderSignOff = () => (
+        <div style={{ padding: 20 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 20 }}>Audit Sign-Off</h1>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 24, marginBottom: 20 }}>
+                <div style={{ maxWidth: 800 }}>
+                    <div style={{ borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 16, marginBottom: 16 }}>
+                        <h2 style={{ fontSize: 20, fontWeight: 700, color: COLORS.primary, marginBottom: 4 }}>MUGDHA AUDIT SIGN-OFF FORM</h2>
+                        <p style={{ fontSize: 12, color: COLORS.textMuted }}>Outlet: {stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet}</p>
+                        <p style={{ fontSize: 12, color: COLORS.textMuted }}>Audit Date: {auditStartDate} to {auditEndDate}</p>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 16, marginBottom: 20 }}>
+                        <div>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Store Manager Name</label>
+                            <input type="text" value={storeManagerName} onChange={(e) => setStoreManagerName(e.target.value)}
+                                style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }} />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Audit Team Lead</label>
+                            <select style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}>
+                                <option value="">Select team member</option>
+                                {teamMembers.filter(m => m.active).map(m => <option key={m.id} value={m.name}>{m.name} - {m.role}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 11, fontWeight: 600, color: COLORS.text, display: 'block', marginBottom: 5 }}>Key Findings & Observations</label>
+                            <textarea value={auditNotes} onChange={(e) => setAuditNotes(e.target.value)}
+                                style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13, minHeight: 100, fontFamily: 'monospace' }} />
+                        </div>
+                    </div>
+
+                    <div style={{ background: COLORS.section, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 16, marginBottom: 16 }}>
+                        <h4 style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, marginBottom: 12 }}>Audit Summary</h4>
+                        <table style={{ width: '100%', fontSize: 12 }}>
+                            <tbody>
+                                <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                                    <td style={{ padding: 8, fontWeight: 600 }}>Physical Count:</td>
+                                    <td style={{ padding: 8, textAlign: 'right' }}>{formatNumber(calculations.physicalCount)}</td>
+                                </tr>
+                                <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                                    <td style={{ padding: 8, fontWeight: 600 }}>ERP Adjusted:</td>
+                                    <td style={{ padding: 8, textAlign: 'right' }}>{formatNumber(calculations.erpAdjusted)}</td>
+                                </tr>
+                                <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                                    <td style={{ padding: 8, fontWeight: 600 }}>Variance %:</td>
+                                    <td style={{ padding: 8, textAlign: 'right' }}>{calculations.variancePercent.toFixed(2)}%</td>
+                                </tr>
+                                <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                                    <td style={{ padding: 8, fontWeight: 600 }}>Shrinkage %:</td>
+                                    <td style={{ padding: 8, textAlign: 'right' }}>{calculations.shrinkageRate.toFixed(2)}%</td>
+                                </tr>
+                                <tr>
+                                    <td style={{ padding: 8, fontWeight: 600 }}>Risk Rating:</td>
+                                    <td style={{ padding: 8, textAlign: 'right', fontWeight: 700, color: calculations.riskRating === 'CRITICAL' ? COLORS.error : calculations.riskRating === 'HIGH' ? COLORS.warning : COLORS.success }}>
+                                        {calculations.riskRating}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 20 }}>
+                        <div>
+                            <div style={{ height: 60, border: `1px dashed ${COLORS.border}`, borderRadius: 6, marginBottom: 8 }}></div>
+                            <p style={{ fontSize: 11, fontWeight: 600, color: COLORS.text }}>Store Manager Signature</p>
+                            <p style={{ fontSize: 10, color: COLORS.textMuted }}>Date: _____________</p>
+                        </div>
+                        <div>
+                            <div style={{ height: 60, border: `1px dashed ${COLORS.border}`, borderRadius: 6, marginBottom: 8 }}></div>
+                            <p style={{ fontSize: 11, fontWeight: 600, color: COLORS.text }}>Audit Lead Signature</p>
+                            <p style={{ fontSize: 10, color: COLORS.textMuted }}>Date: _____________</p>
+                        </div>
+                    </div>
+
+                    <button onClick={() => window.print()} style={{ width: '100%', padding: '12px 16px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>
+                        🖨 Print Sign-Off Form
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderEmails = () => (
+        <div style={{ padding: 20 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 20 }}>Email Drafts</h1>
+
+            <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Auto-Generated Email Templates</h3>
+                <div style={{ display: 'grid', gap: 16 }}>
+                    <div style={{ background: COLORS.section, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 16 }}>
+                        <h4 style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, marginBottom: 8 }}>Audit Initiation</h4>
+                        <textarea readOnly value={`Dear Team,\n\nAudit for ${stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet} is scheduled from ${auditStartDate} to ${auditEndDate}.\n\nAudit Team: ${auditTeam.join(', ') || 'TBD'}\nEstimated SKU Count: ${estimatedTotal}\n\nPlease ensure all data is ready.\n\nBest regards,\nAudit Hub`}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, minHeight: 120, fontFamily: 'monospace', color: COLORS.text }} />
+                        <button onClick={() => copyToClipboard(`Dear Team,\n\nAudit for ${stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet} is scheduled from ${auditStartDate} to ${auditEndDate}.\n\nAudit Team: ${auditTeam.join(', ') || 'TBD'}\nEstimated SKU Count: ${estimatedTotal}\n\nPlease ensure all data is ready.\n\nBest regards,\nAudit Hub`)}
+                            style={{ marginTop: 10, padding: '8px 16px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            📋 Copy to Clipboard
+                        </button>
+                    </div>
+
+                    <div style={{ background: COLORS.section, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: 16 }}>
+                        <h4 style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, marginBottom: 8 }}>Audit Results</h4>
+                        <textarea readOnly value={`Dear Management,\n\nAudit Results for ${stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet}:\n\nPhysical Count: ${formatNumber(calculations.physicalCount)}\nERP Adjusted: ${formatNumber(calculations.erpAdjusted)}\nVariance: ${calculations.variancePercent.toFixed(2)}%\nShrinkage Rate: ${calculations.shrinkageRate.toFixed(2)}%\nRisk Rating: ${calculations.riskRating}\nMatch Rate: ${calculations.matchRate.toFixed(1)}%\n\nKey Observations:\n${auditNotes || 'No observations recorded'}\n\nBest regards,\nAudit Team`}
+                            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, minHeight: 140, fontFamily: 'monospace', color: COLORS.text }} />
+                        <button onClick={() => copyToClipboard(`Dear Management,\n\nAudit Results for ${stores.find(s => s.code === selectedOutlet)?.name || selectedOutlet}:\n\nPhysical Count: ${formatNumber(calculations.physicalCount)}\nERP Adjusted: ${formatNumber(calculations.erpAdjusted)}\nVariance: ${calculations.variancePercent.toFixed(2)}%\nShrinkage Rate: ${calculations.shrinkageRate.toFixed(2)}%\nRisk Rating: ${calculations.riskRating}\nMatch Rate: ${calculations.matchRate.toFixed(1)}%\n\nKey Observations:\n${auditNotes || 'No observations recorded'}\n\nBest regards,\nAudit Team`)}
+                            style={{ marginTop: 10, padding: '8px 16px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            📋 Copy to Clipboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderSettings = () => (
+        <div style={{ padding: 20 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, marginBottom: 20 }}>Settings</h1>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Manage Outlets</h3>
+                    <div style={{ marginBottom: 16 }}>
+                        <input type="text" value={newStoreForm.code} onChange={(e) => setNewStoreForm({...newStoreForm, code: e.target.value})}
+                            placeholder="Code" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, marginBottom: 8 }} />
+                        <input type="text" value={newStoreForm.name} onChange={(e) => setNewStoreForm({...newStoreForm, name: e.target.value})}
+                            placeholder="Name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, marginBottom: 8 }} />
+                        <input type="text" value={newStoreForm.state} onChange={(e) => setNewStoreForm({...newStoreForm, state: e.target.value})}
+                            placeholder="State" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, marginBottom: 8 }} />
+                        <input type="text" value={newStoreForm.city} onChange={(e) => setNewStoreForm({...newStoreForm, city: e.target.value})}
+                            placeholder="City" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, marginBottom: 8 }} />
+                        <input type="text" value={newStoreForm.manager} onChange={(e) => setNewStoreForm({...newStoreForm, manager: e.target.value})}
+                            placeholder="Manager" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, marginBottom: 8 }} />
+                        <button onClick={() => { setStores([...stores, {...newStoreForm, id: Math.max(...stores.map(s => s.id), 0) + 1, active: true}]); setNewStoreForm({ code: '', name: '', state: '', city: '', manager: '' }); }}
+                            style={{ width: '100%', padding: '8px 12px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            Add Outlet
+                        </button>
+                    </div>
+                    <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                        {stores.map(store => (
+                            <div key={store.id} style={{ background: COLORS.section, padding: 8, borderRadius: 6, marginBottom: 8, fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div><strong>{store.name}</strong> ({store.city})</div>
+                                <button onClick={() => setStores(stores.filter(s => s.id !== store.id))} style={{ padding: '3px 8px', background: COLORS.error, color: 'white', border: 'none', borderRadius: 3, cursor: 'pointer', fontSize: 10 }}>Delete</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, marginBottom: 16 }}>Manage Team</h3>
+                    <div style={{ marginBottom: 16 }}>
+                        <input type="text" value={newMemberForm.name} onChange={(e) => setNewMemberForm({...newMemberForm, name: e.target.value})}
+                            placeholder="Name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, marginBottom: 8 }} />
+                        <input type="text" value={newMemberForm.role} onChange={(e) => setNewMemberForm({...newMemberForm, role: e.target.value})}
+                            placeholder="Role" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, marginBottom: 8 }} />
+                        <input type="text" value={newMemberForm.phone} onChange={(e) => setNewMemberForm({...newMemberForm, phone: e.target.value})}
+                            placeholder="Phone" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, marginBottom: 8 }} />
+                        <button onClick={() => { setTeamMembers([...teamMembers, {...newMemberForm, id: Math.max(...teamMembers.map(m => m.id), 0) + 1, active: true}]); setNewMemberForm({ name: '', role: '', phone: '' }); }}
+                            style={{ width: '100%', padding: '8px 12px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            Add Member
+                        </button>
+                    </div>
+                    <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                        {teamMembers.map(member => (
+                            <div key={member.id} style={{ background: COLORS.section, padding: 8, borderRadius: 6, marginBottom: 8, fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div><strong>{member.name}</strong> - {member.role}</div>
+                                <button onClick={() => setTeamMembers(teamMembers.filter(m => m.id !== member.id))} style={{ padding: '3px 8px', background: COLORS.error, color: 'white', border: 'none', borderRadius: 3, cursor: 'pointer', fontSize: 10 }}>Delete</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* ─── FIREBASE LIVE SYNC ──────────────────────────────────── */}
+            <div style={{ marginTop: 20, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.text, margin: 0 }}>🔴 Live Sync — Firebase Realtime Database</h3>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: fbStatus === 'live' ? COLORS.successBg : COLORS.section, color: fbStatusColor, border: `1px solid ${fbStatusColor}` }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: fbStatusColor, display: 'inline-block' }}></span>
+                        {fbStatusLabel}
+                    </span>
+                </div>
+                <p style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 16, lineHeight: 1.6 }}>
+                    Connect a free Firebase project to enable real-time multi-device scanning. Staff scan on their phones → scans appear instantly on your admin dashboard.
+                    <br />Get credentials from <strong>Firebase Console → Project Settings → Your apps → Config</strong> (use the <em>databaseURL</em> from the Realtime Database section).
+                </p>
+
+                {fbConfig ? (
+                    <div style={{ background: COLORS.successBg, border: `1px solid ${COLORS.success}`, borderRadius: 8, padding: 14, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.success }}>✓ Firebase Configured</div>
+                            <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 3 }}>Project: <strong>{fbConfig.projectId}</strong> | DB: <strong>{fbConfig.databaseURL}</strong></div>
+                        </div>
+                        <button onClick={() => { setFbConfig(null); setFbDb(null); setFbStatus('offline'); localStorage.removeItem('mugdha_fb_config'); }}
+                            style={{ padding: '6px 14px', background: COLORS.error, color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>
+                            Disconnect
+                        </button>
+                    </div>
+                ) : null}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                    {[
+                        { field: 'apiKey', label: 'API Key', placeholder: 'AIzaSy...' },
+                        { field: 'authDomain', label: 'Auth Domain', placeholder: 'your-project.firebaseapp.com' },
+                        { field: 'databaseURL', label: 'Database URL ★', placeholder: 'https://your-project-default-rtdb.firebaseio.com' },
+                        { field: 'projectId', label: 'Project ID', placeholder: 'your-project-id' },
+                    ].map(({ field, label, placeholder }) => (
+                        <div key={field}>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: COLORS.text, display: 'block', marginBottom: 5 }}>{label}</label>
+                            <input type={field === 'apiKey' ? 'password' : 'text'}
+                                value={fbConfigForm[field]}
+                                onChange={e => setFbConfigForm({ ...fbConfigForm, [field]: e.target.value })}
+                                placeholder={placeholder}
+                                style={{ width: '100%', padding: '9px 12px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 12, fontFamily: field === 'apiKey' ? 'monospace' : 'inherit' }} />
+                        </div>
+                    ))}
+                </div>
+                <button onClick={() => {
+                    const cfg = { ...fbConfigForm };
+                    if (!cfg.apiKey || !cfg.databaseURL || !cfg.projectId) { alert('Please fill in API Key, Database URL, and Project ID at minimum.'); return; }
+                    setFbConfig(cfg);
+                    localStorage.setItem('mugdha_fb_config', JSON.stringify(cfg));
+                    setFbConfigForm({ apiKey: '', authDomain: '', databaseURL: '', projectId: '' });
+                }} style={{ padding: '10px 28px', background: COLORS.primary, color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+                    Save &amp; Connect Firebase
+                </button>
+                <span style={{ marginLeft: 16, fontSize: 11, color: COLORS.textMuted }}>Credentials are saved locally in your browser only — never sent to any server.</span>
+            </div>
+        </div>
+    );
+
+    // Staff users: scanner-only view (no sidebar)
+    if (!isAdmin) {
+        return (
+            <div style={{ minHeight: '100vh', background: COLORS.bg }}>
+                {renderScanner()}
+            </div>
+        );
+    }
+
+    // Admin: full sidebar + all tabs
+    const visibleNav = NAV_ITEMS;
+
+    return (
+        <div style={{ display: 'flex', minHeight: '100vh', background: COLORS.bg }}>
+            {/* Sidebar */}
+            <div style={{
+                position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 200,
+                width: sidebarOpen ? 240 : 0,
+                overflow: 'hidden',
+                background: COLORS.sidebar,
+                transition: 'width 0.25s ease',
+                display: 'flex', flexDirection: 'column',
+            }}>
+                <div style={{ width: 240, minWidth: 240, height: '100%', display: 'flex', flexDirection: 'column', padding: '20px 0' }}>
+                    <div style={{ padding: '0 16px', marginBottom: 8 }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.gold, letterSpacing: 2 }}>MUGDHA</div>
+                        <div style={{ fontSize: 10, color: COLORS.textLight, letterSpacing: 0.5 }}>Audit Hub v8 — Admin</div>
+                    </div>
+                    {/* User badge */}
+                    <div style={{ margin: '8px 16px 16px', padding: '8px 12px', background: 'rgba(201,168,76,0.12)', borderRadius: 8, border: '1px solid rgba(201,168,76,0.25)' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.gold }}>👤 {currentUser?.name}</div>
+                        <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>{currentUser?.display}</div>
+                    </div>
+                    <nav style={{ flex: 1, overflowY: 'auto' }}>
+                        {visibleNav.map(item => (
+                            <button key={item.id} onClick={() => setActiveTab(item.id)}
+                                style={{
+                                    width: '100%', padding: '11px 16px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                                    background: activeTab === item.id ? COLORS.sidebarActive : 'transparent',
+                                    color: activeTab === item.id ? 'white' : COLORS.textLight,
+                                    transition: 'all 0.2s',
+                                    display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 500,
+                                    borderLeft: activeTab === item.id ? `3px solid ${COLORS.gold}` : '3px solid transparent',
+                                }}>
+                                <div style={{
+                                    width: 26, height: 26, borderRadius: '50%',
+                                    background: activeTab === item.id ? COLORS.gold : COLORS.sidebarHover,
+                                    color: activeTab === item.id ? COLORS.sidebar : COLORS.textLight,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 9, fontWeight: 700
+                                }}>{item.abbr}</div>
+                                <span>{item.label}</span>
+                            </button>
+                        ))}
+                    </nav>
+                    {/* Logout at bottom */}
+                    <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                        <button onClick={onLogout} style={{ width: '100%', padding: '9px', background: 'rgba(185,28,28,0.15)', border: '1px solid rgba(185,28,28,0.3)', color: '#f87171', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>
+                            ⎋ Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Sidebar toggle */}
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
+                position: 'fixed', top: '50%', left: sidebarOpen ? 228 : 8,
+                transform: 'translateY(-50%)', zIndex: 300,
+                width: 24, height: 48, borderRadius: sidebarOpen ? '0 8px 8px 0' : '8px',
+                background: COLORS.primary, color: 'white', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 14, fontWeight: 'bold', transition: 'left 0.25s ease',
+                boxShadow: '2px 0 8px rgba(0,0,0,0.3)',
+            }}>
+                {sidebarOpen ? '‹' : '›'}
+            </button>
+
+            {/* Main content */}
+            <div style={{ marginLeft: sidebarOpen ? 240 : 0, transition: 'margin-left 0.25s ease', flex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                    {activeTab === 'dashboard' && renderDashboard()}
+                    {activeTab === 'scanner' && renderScanner()}
+                    {activeTab === 'schedule' && renderSchedule()}
+                    {activeTab === 'upload' && renderUpload()}
+                    {activeTab === 'progress' && renderProgress()}
+                    {activeTab === 'analysis' && renderAnalysis()}
+                    {activeTab === 'shrinkage' && renderShrinkage()}
+                    {activeTab === 'reports' && renderReports()}
+                    {activeTab === 'signoff' && renderSignOff()}
+                    {activeTab === 'emails' && renderEmails()}
+                    {activeTab === 'settings' && renderSettings()}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── ROOT APP WITH AUTH ───────────────────────────────────────────────────────
+function App() {
+    const [currentUser, setCurrentUser] = useState(null);
+    if (!currentUser) return <LoginScreen onLogin={setCurrentUser} />;
+    return <MugdhaAuditHub currentUser={currentUser} onLogout={() => setCurrentUser(null)} />;
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+    </script>
+</body>
+</html>
